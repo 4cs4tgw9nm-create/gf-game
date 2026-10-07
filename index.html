@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kounouz's Treasure Night</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600;1,700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Layout: one full-screen night sky; the game canvas fills it, story screens float above as soft cards. */
+:root {
+  --night: #0e1530;
+  --deep: #1a2452;
+  --ink: #f6efe6;
+  --mist: #aab3d8;
+  --gold: #f2c46d;
+  --rose: #f29bb0;
+  --card: rgba(22, 31, 70, 0.82);
+  --line: rgba(242, 196, 109, 0.28);
+  --display: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
+  --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--night);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.55;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+
+#app { position: fixed; inset: 0; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+/* HUD */
+.hud {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 0;
+  display: flex; align-items: center; gap: 12px;
+  pointer-events: none;
+}
+.meter { flex: 1; min-width: 0; }
+.meter-label {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--mist);
+  font-variant-numeric: tabular-nums;
+}
+.meter-label b { color: var(--gold); }
+.bar { height: 8px; margin-top: 6px; border-radius: 99px; background: rgba(170, 179, 216, 0.18); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--rose), var(--gold)); border-radius: inherit; transition: width .4s ease; }
+.icon-btn {
+  pointer-events: auto;
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  font: 600 13px var(--body); cursor: pointer;
+}
+
+/* Floating compliments */
+.pop {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  max-width: min(88vw, 420px); text-align: center;
+  font-family: var(--display); font-style: italic; font-weight: 600;
+  font-size: clamp(22px, 5.6vw, 30px); line-height: 1.2; color: var(--ink);
+  text-shadow: 0 2px 18px rgba(242, 196, 109, 0.55);
+  pointer-events: none;
+  animation: rise 2.6s ease-out forwards;
+}
+@keyframes rise {
+  0% { opacity: 0; transform: translate(-50%, 16px) scale(.96); }
+  15% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -40px); }
+}
+
+/* Story screens */
+.screen {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  overflow-y: auto;
+  background: radial-gradient(ellipse at 50% 30%, rgba(26, 36, 82, 0.55), rgba(14, 21, 48, 0.86));
+  animation: fade .7s ease both;
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.card {
+  width: 100%; max-width: 460px;
+  padding: 32px 26px;
+  border: 1px solid var(--line); border-radius: 22px;
+  background: var(--card);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.arabic {
+  font-family: "Amiri", "Noto Naskh Arabic", "Geeza Pro", serif;
+  font-size: 34px; line-height: 1; color: var(--gold); direction: rtl;
+}
+h1, h2 {
+  margin: 0; font-family: var(--display); font-style: italic; font-weight: 600;
+  line-height: 1.05; text-wrap: balance;
+}
+h1 { font-size: clamp(42px, 11vw, 58px); }
+h2 { font-size: clamp(32px, 8vw, 42px); }
+h1 em, h2 em { color: var(--gold); font-style: italic; }
+.eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--rose); }
+p { margin: 0; color: var(--ink); }
+.muted { color: var(--mist); font-size: 14px; }
+.btn {
+  align-self: flex-start;
+  border: 0; border-radius: 99px; cursor: pointer;
+  padding: 14px 26px;
+  font: 800 16px var(--body); letter-spacing: .01em;
+  color: var(--night); background: var(--gold);
+  box-shadow: 0 8px 30px rgba(242, 196, 109, 0.35);
+  transition: transform .15s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(1px); }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+.btn:focus-visible, .icon-btn:focus-visible, .coupon:focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.letter p { font-size: 17px; }
+.polaroid {
+  align-self: center; width: min(62%, 220px); margin: 4px 0 6px;
+  padding: 10px 10px 34px; background: var(--ink); border-radius: 4px;
+  transform: rotate(-3deg); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+.polaroid img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 2px; }
+.polaroid figcaption {
+  position: absolute; left: 0; right: 0; bottom: 6px; text-align: center;
+  font-family: var(--display); font-style: italic; font-weight: 600; font-size: 19px; color: var(--deep);
+}
+.letter .sign { font-family: var(--display); font-style: italic; font-size: 24px; color: var(--gold); }
+
+.coupons { display: grid; gap: 12px; }
+.coupon {
+  position: relative; text-align: left; cursor: pointer;
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px;
+  padding: 16px 18px; border-radius: 14px;
+  border: 1.5px dashed var(--line); background: rgba(14, 21, 48, 0.55);
+  color: var(--ink); font: 600 16px var(--body);
+}
+.coupon small { display: block; color: var(--mist); font-weight: 600; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 2px; }
+.coupon .stamp {
+  font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--gold); border: 1.5px solid var(--gold); border-radius: 8px; padding: 4px 8px;
+  white-space: nowrap;
+}
+.coupon.claimed { border-style: solid; border-color: var(--rose); }
+.coupon.claimed .stamp { color: var(--rose); border-color: var(--rose); transform: rotate(-6deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pop, .screen { animation-duration: .01s; }
+  .bar i, .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="sky" aria-label="Treasure catching game: move the chest left and right to catch falling treasures"></canvas>
+
+  <div class="hud" id="hud" hidden>
+    <div class="meter">
+      <div class="meter-label"><span>Treasure chest</span><span><b id="count">0</b> / <span id="goal">20</span></span></div>
+      <div class="bar"><i id="fill"></i></div>
+    </div>
+    <button class="icon-btn" id="mute" aria-label="Toggle sound">♪</button>
+  </div>
+
+  <div id="pops"></div>
+
+  <!-- Intro -->
+  <section class="screen" id="intro">
+    <div class="card">
+      <div class="arabic">كنوز</div>
+      <div class="eyebrow">A little game for one person only</div>
+      <h1>Hi <em id="nameHi">Kounouz</em>, take a break.</h1>
+      <p>Your name means <em>treasures</em>, so tonight the sky is raining them. Slide the chest to catch a few. There is no timer, no score to lose, and nothing can go wrong.</p>
+      <p class="muted">Drag with your finger or mouse. Arrow keys work too. Missed treasures just float away. Watch for the golden lockets, they're worth three.</p>
+      <div class="row"><button class="btn" id="start">Start catching</button></div>
+    </div>
+  </section>
+
+  <!-- Letter -->
+  <section class="screen" id="letterScreen" hidden>
+    <div class="card letter">
+      <div class="eyebrow">Chest full</div>
+      <h2>You found every one, <em id="nameLetter">Kounouz</em>.</h2>
+      <figure class="polaroid" style="margin-inline:auto"><img id="photo" alt="Kounouz smiling"><figcaption>my favorite treasure</figcaption></figure>
+      <div id="letterBody" style="display:grid;gap:12px"></div>
+      <div class="sign" id="sign"></div>
+      <div class="row"><button class="btn" id="toGifts">Open your gifts</button></div>
+    </div>
+  </section>
+
+  <!-- Gifts -->
+  <section class="screen" id="giftScreen" hidden>
+    <div class="card">
+      <div class="eyebrow">Real coupons, no expiry date</div>
+      <h2>Tap one to <em>claim</em> it.</h2>
+      <p class="muted">Screenshot the ones you claim and send them to me. I have to honor them.</p>
+      <div class="coupons" id="coupons"></div>
+      <div class="row">
+        <button class="btn ghost" id="again">Play again</button>
+        <button class="btn ghost" id="rest">Now go rest</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Goodnight -->
+  <section class="screen" id="nightScreen" hidden>
+    <div class="card" style="text-align:center;align-items:center">
+      <div class="arabic">تصبحي على خير</div>
+      <h2>Rest now, <em>my treasure</em>.</h2>
+      <p class="muted">Phone down, eyes closed. I love you.</p>
+      <button class="btn ghost" id="backGifts" style="align-self:center">Back to gifts</button>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ============================================================
+   EDIT HERE: personalize everything in this block
+   ============================================================ */
+const CONFIG = {
+  name: "Kounouz",
+  from: "Yours, always",
+  photo: "assets/kounouz.jpg",
+  goal: 20,
+  compliments: [
+    "You're doing so much better than you think",
+    "Enti kenzi. You're my treasure",
+    "Your laugh fixes my whole day",
+    "You're allowed to rest",
+    "Proud of you, always",
+    "Prettiest girl in every room",
+    "You make hard days feel lighter",
+    "I'm so lucky it's you",
+    "You're stronger than tired",
+    "Nhebbek barcha",
+    "Your smile? Unfair.",
+    "Home is wherever you are",
+    "You deserve soft things",
+    "You worked hard. Breathe.",
+    "Still thinking about you",
+    "Everything's better with you in it",
+    "My favorite person, by far",
+    "You're the kindest heart I know",
+    "Tomorrow can wait",
+    "Almost full. Just like my heart"
+  ],
+  letter: [
+    "I know today took a lot out of you. You give so much to everyone around you, and you rarely stop to give some back to yourself.",
+    "So this is me, reminding you: you are loved, you are enough, and you don't have to be strong every minute.",
+    "Whatever's still on your list can wait. Tonight you're off duty."
+  ],
+  coupons: [
+    { tag: "Valid tonight", text: "A long massage, no time limit" },
+    { tag: "Valid any day", text: "I cook dinner. You pick the menu" },
+    { tag: "Valid any day", text: "Your movie, zero complaints from me" },
+    { tag: "Valid any morning", text: "Breakfast in bed" },
+    { tag: "Valid whenever", text: "One big hug, on demand, wherever we are" }
+  ]
+};
+/* ============================================================ */
+
+const $ = id => document.getElementById(id);
+const canvas = $("sky");
+const ctx = canvas.getContext("2d");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = canvas.clientWidth; H = canvas.clientHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  makeStars();
+  chest.x = Math.min(Math.max(chest.x || W / 2, 0), W);
+  chest.tx = chest.x;
+}
+addEventListener("resize", resize);
+
+/* ---------- background ---------- */
+let stars = [];
+function makeStars() {
+  const n = Math.round((W * H) / 5200);
+  stars = Array.from({ length: n }, () => ({
+    x: Math.random() * W, y: Math.random() * H,
+    r: Math.random() * 1.3 + 0.3, p: Math.random() * Math.PI * 2, s: 0.6 + Math.random() * 1.6
+  }));
+}
+function drawSky(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#0b1129"); g.addColorStop(0.6, "#16204a"); g.addColorStop(1, "#2a2a5c");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const s of stars) {
+    const a = 0.35 + 0.45 * Math.sin(t * 0.001 * s.s + s.p) ** 2;
+    ctx.globalAlpha = a; ctx.fillStyle = "#f6efe6";
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // moon
+  const mx = W * 0.82, my = Math.max(90, H * 0.14), mr = Math.min(W, H) * 0.06 + 14;
+  const mg = ctx.createRadialGradient(mx, my, mr * 0.2, mx, my, mr * 3);
+  mg.addColorStop(0, "rgba(246,239,230,0.25)"); mg.addColorStop(1, "rgba(246,239,230,0)");
+  ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, mr * 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#f6efe6"; ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#16204a"; ctx.beginPath(); ctx.arc(mx + mr * 0.42, my - mr * 0.22, mr * 0.9, 0, Math.PI * 2); ctx.fill();
+  // dunes
+  ctx.fillStyle = "#1b1d45";
+  ctx.beginPath(); ctx.moveTo(0, H);
+  ctx.quadraticCurveTo(W * 0.25, H - 70, W * 0.55, H - 30);
+  ctx.quadraticCurveTo(W * 0.8, H - 5, W, H - 50);
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+}
+
+/* ---------- treasures ---------- */
+const TYPES = [
+  { kind: "pearl", w: 4, value: 1 },
+  { kind: "gem", w: 4, value: 1 },
+  { kind: "star", w: 3, value: 1 },
+  { kind: "heart", w: 1, value: 3 },
+  { kind: "locket", w: 1.2, value: 3 }
+];
+const GEM_COLORS = ["#7fd4c8", "#f29bb0", "#b79cf2", "#8fb6f2"];
+const totalW = TYPES.reduce((a, b) => a + b.w, 0);
+function pickType() {
+  let r = Math.random() * totalW;
+  for (const t of TYPES) { if ((r -= t.w) < 0) return t; }
+  return TYPES[0];
+}
+
+function drawPearl(r) {
+  const g = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r);
+  g.addColorStop(0, "#ffffff"); g.addColorStop(0.6, "#efe6f2"); g.addColorStop(1, "#b9b0d0");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+}
+function drawGem(r, c) {
+  ctx.fillStyle = c;
+  ctx.beginPath();
+  ctx.moveTo(-r, -r * 0.3); ctx.lineTo(-r * 0.5, -r * 0.8); ctx.lineTo(r * 0.5, -r * 0.8);
+  ctx.lineTo(r, -r * 0.3); ctx.lineTo(0, r); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-r, -r * 0.3); ctx.lineTo(r, -r * 0.3);
+  ctx.moveTo(-r * 0.5, -r * 0.8); ctx.lineTo(-r * 0.2, -r * 0.3); ctx.lineTo(0, r);
+  ctx.moveTo(r * 0.5, -r * 0.8); ctx.lineTo(r * 0.2, -r * 0.3); ctx.lineTo(0, r);
+  ctx.stroke();
+}
+function drawStar(r) {
+  ctx.fillStyle = "#f2c46d";
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+function heartPath(r) {
+  ctx.beginPath();
+  ctx.moveTo(0, r * 0.9);
+  ctx.bezierCurveTo(-r * 1.4, -r * 0.1, -r * 0.6, -r * 1.1, 0, -r * 0.4);
+  ctx.bezierCurveTo(r * 0.6, -r * 1.1, r * 1.4, -r * 0.1, 0, r * 0.9);
+  ctx.closePath();
+}
+function drawHeart(r) {
+  const g = ctx.createLinearGradient(0, -r, 0, r);
+  g.addColorStop(0, "#ffc2cf"); g.addColorStop(1, "#e56f8e");
+  ctx.shadowColor = "rgba(242,155,176,0.9)"; ctx.shadowBlur = 18;
+  ctx.fillStyle = g; heartPath(r); ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+const photo = new Image();
+photo.src = CONFIG.photo;
+function drawLocket(r) {
+  ctx.shadowColor = "rgba(242,196,109,0.9)"; ctx.shadowBlur = 20;
+  ctx.fillStyle = "#f2c46d"; ctx.beginPath(); ctx.arc(0, 0, r + 4, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.clip();
+  if (photo.complete && photo.naturalWidth) {
+    // centered on her face (roughly 48% across, 42% down the cropped photo)
+    const s = (r * 2.6) / photo.naturalWidth, iw = photo.naturalWidth * s, ih = photo.naturalHeight * s;
+    ctx.drawImage(photo, -iw * 0.48, -ih * 0.42, iw, ih);
+  } else { ctx.fillStyle = "#f29bb0"; ctx.fill(); }
+  ctx.restore();
+  ctx.fillStyle = "#f2c46d"; ctx.beginPath(); ctx.arc(0, -r - 6, 4, 0, Math.PI * 2); ctx.fill();
+}
+
+let items = [], sparks = [];
+function spawn() {
+  const t = pickType();
+  const r = (t.kind === "locket" ? 26 : t.kind === "heart" ? 20 : 15) * Math.min(1.25, Math.max(0.9, W / 500));
+  items.push({
+    ...t, r,
+    x: r + Math.random() * (W - 2 * r), y: -r * 2,
+    vy: (H * 0.16 + Math.random() * H * 0.08) * (reduceMotion ? 0.7 : 1),
+    sway: Math.random() * Math.PI * 2, rot: t.kind === "locket" ? 0 : (Math.random() - 0.5) * 0.6,
+    color: GEM_COLORS[(Math.random() * GEM_COLORS.length) | 0]
+  });
+}
+function burst(x, y, color) {
+  for (let i = 0; i < 16; i++) {
+    const a = Math.random() * Math.PI * 2, s = 60 + Math.random() * 160;
+    sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 80, life: 1, color });
+  }
+}
+
+/* ---------- chest ---------- */
+const chest = { x: 0, tx: 0 };
+function chestDims() {
+  const w = Math.min(150, Math.max(104, W * 0.28));
+  const h = w * 0.52;
+  const bottom = H - Math.max(26, H * 0.05);
+  return { w, h, top: bottom - h, bottom };
+}
+function drawChest(fillRatio) {
+  const { w, h, top } = chestDims();
+  const x = chest.x - w / 2;
+  // lid (open, behind)
+  ctx.fillStyle = "#5a321b";
+  ctx.beginPath();
+  ctx.moveTo(x + 4, top); ctx.lineTo(x + w - 4, top);
+  ctx.lineTo(x + w - 12, top - h * 0.55); ctx.lineTo(x + 12, top - h * 0.55); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#c9953f"; ctx.fillRect(x + 12, top - h * 0.55, w - 24, 4);
+  // glow + loot
+  const lootH = h * 0.75 * fillRatio;
+  if (fillRatio > 0) {
+    const gg = ctx.createRadialGradient(chest.x, top, 4, chest.x, top, w * 0.8);
+    gg.addColorStop(0, `rgba(242,196,109,${0.25 + 0.35 * fillRatio})`); gg.addColorStop(1, "rgba(242,196,109,0)");
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(chest.x, top, w * 0.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f2c46d";
+    ctx.beginPath();
+    ctx.moveTo(x + 6, top + 4);
+    ctx.quadraticCurveTo(chest.x, top + 4 - lootH * 1.4, x + w - 6, top + 4);
+    ctx.closePath(); ctx.fill();
+  }
+  // body
+  const bg = ctx.createLinearGradient(0, top, 0, top + h);
+  bg.addColorStop(0, "#8a5129"); bg.addColorStop(1, "#5a321b");
+  ctx.fillStyle = bg;
+  roundRect(x, top, w, h, 8); ctx.fill();
+  ctx.fillStyle = "#e0ad52";
+  ctx.fillRect(x, top + 5, w, 5);
+  ctx.fillRect(x + w * 0.18, top, 6, h);
+  ctx.fillRect(x + w * 0.82 - 6, top, 6, h);
+  // lock
+  ctx.fillStyle = "#f2c46d"; roundRect(chest.x - 9, top + h * 0.35, 18, 20, 4); ctx.fill();
+  ctx.fillStyle = "#5a321b"; ctx.beginPath(); ctx.arc(chest.x, top + h * 0.35 + 9, 3, 0, Math.PI * 2); ctx.fill();
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+/* ---------- input ---------- */
+function setTarget(e) { chest.tx = e.clientX - canvas.getBoundingClientRect().left; }
+canvas.addEventListener("pointerdown", e => { setTarget(e); canvas.setPointerCapture?.(e.pointerId); });
+canvas.addEventListener("pointermove", e => { if (e.pointerType === "mouse" || e.buttons) setTarget(e); });
+const keys = {};
+addEventListener("keydown", e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { keys[e.key] = true; e.preventDefault(); } });
+addEventListener("keyup", e => { keys[e.key] = false; });
+
+/* ---------- sound ---------- */
+let audio = null, muted = false;
+const NOTES = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
+function chime(big) {
+  if (!audio || muted) return;
+  const now = audio.currentTime;
+  const notes = big ? [NOTES[0], NOTES[2], NOTES[4]] : [NOTES[(Math.random() * NOTES.length) | 0]];
+  notes.forEach((f, i) => {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = "sine"; o.frequency.value = f;
+    g.gain.setValueAtTime(0, now + i * 0.07);
+    g.gain.linearRampToValueAtTime(0.12, now + i * 0.07 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + 0.9);
+    o.connect(g).connect(audio.destination);
+    o.start(now + i * 0.07); o.stop(now + i * 0.07 + 1);
+  });
+}
+$("mute").addEventListener("click", () => {
+  muted = !muted;
+  $("mute").textContent = muted ? "×" : "♪";
+  $("mute").setAttribute("aria-label", muted ? "Turn sound on" : "Turn sound off");
+});
+
+/* ---------- compliments ---------- */
+let complimentIdx = 0;
+function popCompliment(big) {
+  const el = document.createElement("div");
+  el.className = "pop";
+  el.textContent = CONFIG.compliments[complimentIdx++ % CONFIG.compliments.length];
+  el.style.top = (big ? 26 : 30 + Math.random() * 10) + "%";
+  const layer = $("pops");
+  layer.replaceChildren(el);
+  setTimeout(() => el.remove(), 2700);
+}
+
+/* ---------- game state ---------- */
+let state = "intro", score = 0, spawnTimer = 0, last = 0;
+function updateHud() {
+  const s = Math.min(score, CONFIG.goal);
+  $("count").textContent = s;
+  $("fill").style.width = (s / CONFIG.goal * 100) + "%";
+}
+
+function loop(t) {
+  const dt = Math.min(0.05, (t - (last || t)) / 1000);
+  last = t;
+  drawSky(t);
+
+  if (state === "play" || state === "done") {
+    // chest movement
+    if (keys.ArrowLeft) chest.tx -= 520 * dt;
+    if (keys.ArrowRight) chest.tx += 520 * dt;
+    const { w, top } = chestDims();
+    chest.tx = Math.min(Math.max(chest.tx, w / 2), W - w / 2);
+    chest.x += (chest.tx - chest.x) * Math.min(1, dt * 14);
+
+    if (state === "play") {
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) { spawn(); spawnTimer = 0.75 + Math.random() * 0.5; }
+    }
+
+    for (const it of items) {
+      it.y += it.vy * dt;
+      it.sway += dt * 1.6;
+      it.x += Math.sin(it.sway) * 18 * dt;
+      if (it.kind !== "locket") it.rot += Math.sin(it.sway) * 0.6 * dt;
+      if (!it.caught && state === "play" && it.y + it.r * 0.6 >= top && it.y < top + 30 && Math.abs(it.x - chest.x) < w / 2 + it.r * 0.3) {
+        it.caught = true;
+        score += it.value;
+        const big = it.value > 1;
+        burst(it.x, top, it.kind === "heart" ? "#f29bb0" : "#f2c46d");
+        chime(big);
+        popCompliment(big);
+        updateHud();
+        if (score >= CONFIG.goal) finish();
+      }
+    }
+    items = items.filter(it => !it.caught && it.y < H + 40);
+
+    for (const it of items) {
+      ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rot);
+      if (it.kind === "pearl") drawPearl(it.r * 0.8);
+      else if (it.kind === "gem") drawGem(it.r, it.color);
+      else if (it.kind === "star") drawStar(it.r);
+      else if (it.kind === "locket") drawLocket(it.r);
+      else drawHeart(it.r);
+      ctx.restore();
+    }
+    drawChest(Math.min(score, CONFIG.goal) / CONFIG.goal);
+  }
+
+  // sparks
+  for (const s of sparks) {
+    s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 260 * dt; s.life -= dt * 1.4;
+    if (s.life > 0) {
+      ctx.globalAlpha = s.life; ctx.fillStyle = s.color;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  sparks = sparks.filter(s => s.life > 0);
+
+  requestAnimationFrame(loop);
+}
+
+function show(id) {
+  for (const s of ["intro", "letterScreen", "giftScreen", "nightScreen"]) $(s).hidden = s !== id;
+}
+
+function start() {
+  if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  audio?.resume?.();
+  score = 0; items = []; complimentIdx = 0; spawnTimer = 0.3;
+  updateHud();
+  show(null);
+  $("hud").hidden = false;
+  chest.x = chest.tx = W / 2;
+  state = "play";
+}
+
+function finish() {
+  state = "done";
+  // celebration shower
+  for (let i = 0; i < 6; i++) setTimeout(() => burst(Math.random() * W, H * (0.2 + Math.random() * 0.4), i % 2 ? "#f29bb0" : "#f2c46d"), i * 180);
+  if (audio && !muted) setTimeout(() => chime(true), 300);
+  setTimeout(() => { state = "rest"; items = []; $("hud").hidden = true; $("pops").replaceChildren(); show("letterScreen"); }, 1900);
+}
+
+/* ---------- coupons ---------- */
+const STORE_KEY = "kounouz-claimed";
+function loadClaimed() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch (e) { return []; } }
+function saveClaimed(list) { try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch (e) {} }
+function renderCoupons() {
+  const claimed = loadClaimed();
+  $("coupons").replaceChildren(...CONFIG.coupons.map((c, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.id = "coupon-" + i;
+    const isOn = claimed.includes(i);
+    b.className = "coupon" + (isOn ? " claimed" : "");
+    b.setAttribute("aria-pressed", isOn);
+    b.innerHTML = `<span><small></small><span class="t"></span></span><span class="stamp">${isOn ? "Claimed" : "Claim"}</span>`;
+    b.querySelector("small").textContent = c.tag;
+    b.querySelector(".t").textContent = c.text;
+    b.addEventListener("click", () => {
+      const list = loadClaimed();
+      const at = list.indexOf(i);
+      if (at >= 0) list.splice(at, 1); else { list.push(i); chime(false); }
+      saveClaimed(list); renderCoupons();
+      $("coupon-" + i)?.focus();
+    });
+    return b;
+  }));
+}
+
+/* ---------- wire up ---------- */
+$("nameHi").textContent = CONFIG.name;
+$("nameLetter").textContent = CONFIG.name;
+$("goal").textContent = CONFIG.goal;
+$("letterBody").replaceChildren(...CONFIG.letter.map(t => { const p = document.createElement("p"); p.textContent = t; return p; }));
+$("sign").textContent = CONFIG.from;
+$("photo").src = CONFIG.photo;
+$("start").addEventListener("click", start);
+$("toGifts").addEventListener("click", () => { renderCoupons(); show("giftScreen"); });
+$("again").addEventListener("click", start);
+$("rest").addEventListener("click", () => show("nightScreen"));
+$("backGifts").addEventListener("click", () => show("giftScreen"));
+
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
