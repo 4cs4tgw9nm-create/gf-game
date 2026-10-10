@@ -203,7 +203,7 @@ p { margin: 0; }
     <div class="cast"><canvas id="castK" width="10" height="14"></canvas><canvas id="castR" width="10" height="14"></canvas></div>
     <p>Rabie hid a few things around town for you. Find them all and follow the path to the end. He's waiting there.</p>
     <ol class="levels" id="levelList"></ol>
-    <p class="muted">Every level you finish unlocks a real gift. Watch out for pigeons, scooters and a very jealous bee.</p>
+    <p class="muted">Every level you finish unlocks a real gift. Bumping into pigeons, scooters or the bee is fine. Nothing can make you lose.</p>
     <button class="btn" id="play" type="button">Start ▸</button>
   </div>
 </section>
@@ -270,7 +270,7 @@ const CONFIG = {
       ],
       intro: [
         ["Note on the fridge", "Good morning Kounouz. Follow the path, collect what I hid, and come find me. ♥ Rabie"],
-        ["Level 1", "The café. Collect all 5 matchas. The pigeons are jealous of you, so stay away from them."]
+        ["Level 1", "The café. Collect all 5 matchas. The pigeons are jealous of you, but they're harmless."]
       ],
       npc: ["Barista", "Rabie called ahead. He said: \"Make it perfect, it's for the prettiest girl in the world.\""],
       unlock: "All matchas! The door is open ▸",
@@ -296,9 +296,9 @@ const CONFIG = {
         "###########"
       ],
       lanes: [
-        { row: 2, dir: 1, speed: 34, count: 2 }, { row: 3, dir: -1, speed: 46, count: 2 },
-        { row: 6, dir: 1, speed: 58, count: 2 }, { row: 7, dir: -1, speed: 40, count: 3 },
-        { row: 9, dir: 1, speed: 50, count: 2 }, { row: 10, dir: -1, speed: 66, count: 2 }
+        { row: 2, dir: 1, speed: 22, count: 1 }, { row: 3, dir: -1, speed: 28, count: 1 },
+        { row: 6, dir: 1, speed: 30, count: 1 }, { row: 7, dir: -1, speed: 24, count: 2 },
+        { row: 9, dir: 1, speed: 26, count: 1 }, { row: 10, dir: -1, speed: 32, count: 1 }
       ],
       intro: [["Level 2", "Pizza Street! Grab all 5 slices and cross to the top. Nobody here drives slowly."]],
       npc: ["Pizzaiolo", "You're Kounouz? Rabie says you always choose the pizza and he always pays. Forever. His words."],
@@ -324,7 +324,7 @@ const CONFIG = {
         "#S..N....E#",
         "###########"
       ],
-      intro: [["Level 3", "The Framboise Garden. Find all 6 framboises in the maze. A bee wants them too, but it's slow."]],
+      intro: [["Level 3", "The Framboise Garden. Find all 6 framboises in the maze. A lazy bee wants them too, but it's very slow."]],
       npc: ["Gardener", "Rabie planted all these framboises for you. Okay, he bought them. Same thing."],
       unlock: "All framboises! The gate is open ▸",
       reward: "A tiramisu with framboises on top"
@@ -361,10 +361,10 @@ const CONFIG = {
     }
   ],
   hits: {
-    pigeon: "A pigeon wanted your autograph. Back to the start!",
+    pigeon: "Oops! A pigeon wanted your autograph",
     scooter: "Beep beep! Scooter. Try again, ya kanouzti",
     bee: "Bzz! The bee thinks you're sweeter than framboises",
-    cat: "A cat wanted cuddles. Back to the start!"
+    cat: "A cat wanted cuddles. Keep going!"
   },
   letter: [
     "Kounouz, you played the whole game, and you won. You always do.",
@@ -376,7 +376,7 @@ const CONFIG = {
 
 const $ = id => document.getElementById(id);
 const T = 16, COLS = 11, ROWS = 15, LW = COLS * T, LH = ROWS * T;
-const SPEED = 62;
+const SPEED = 76;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const screen = $("screen"), sctx = screen.getContext("2d");
 const buf = document.createElement("canvas"); buf.width = LW; buf.height = LH;
@@ -660,15 +660,17 @@ function moveWalker(w, dt) {
   w.t -= dt;
   if (w.t <= 0 || !w.d) { const ds = ["up", "down", "left", "right", null]; w.d = ds[(Math.random() * 5) | 0]; w.t = .8 + Math.random() * 1.4; }
   if (!w.d) return;
-  const [dx, dy] = VEC[w.d], s = 22 * dt;
+  const [dx, dy] = VEC[w.d], s = 13 * dt;
   const nx = w.x + dx * s, ny = w.y + dy * s;
   if (boxFree(nx, ny, 5)) { w.x = nx; w.y = ny; w.flip = dx > 0; } else w.t = 0;
 }
 function hit() {
-  invuln = 1.6;
+  invuln = 2.2;
   blip(180, .25, "sawtooth", .05); blip(120, .3, "sawtooth", .04, .1);
   toast(CONFIG.hits[L.enemy]);
-  player.x = start.x; player.y = start.y;
+  // gentle: no reset to the start, just a little hop out of the way
+  const [dx, dy] = VEC[player.dir] || [0, 0];
+  for (let k = 0; k < 10; k++) { const nx = player.x - dx, ny = player.y - dy; if (!boxFree(nx, ny)) break; player.x = nx; player.y = ny; }
   for (const bee of bees) { bee.x = bee.sx; bee.y = bee.sy; }
   held.length = 0; clearPad();
 }
@@ -697,7 +699,7 @@ function update(dt, now) {
   for (const w of walkers) moveWalker(w, dt);
   for (const bee of bees) {
     const vx = player.x - bee.x, vy = player.y - bee.y, dist = Math.hypot(vx, vy) || 1;
-    bee.x += vx / dist * 24 * dt; bee.y += vy / dist * 24 * dt; bee.flip = vx > 0;
+    bee.x += vx / dist * 13 * dt; bee.y += vy / dist * 13 * dt; bee.flip = vx > 0;
   }
   for (const sc of scooters) {
     sc.x += sc.dir * sc.speed * dt;
@@ -705,14 +707,14 @@ function update(dt, now) {
     if (sc.dir < 0 && sc.x < -20) sc.x = LW + 20;
   }
   if (invuln <= 0) {
-    for (const w of walkers) if (Math.abs(w.x - player.x) < 9 && Math.abs(w.y - player.y) < 9) return hit();
-    for (const bee of bees) if (Math.hypot(bee.x - player.x, bee.y - player.y) < 9) return hit();
-    for (const sc of scooters) if (Math.abs(sc.x - player.x) < 11 && Math.abs(sc.y - player.y) < 8) return hit();
+    for (const w of walkers) if (Math.abs(w.x - player.x) < 7 && Math.abs(w.y - player.y) < 7) return hit();
+    for (const bee of bees) if (Math.hypot(bee.x - player.x, bee.y - player.y) < 7) return hit();
+    for (const sc of scooters) if (Math.abs(sc.x - player.x) < 9 && Math.abs(sc.y - player.y) < 6) return hit();
   }
 
   // pickups
   for (const p of pickups) {
-    if (!p.got && Math.abs(p.x - player.x) < 10 && Math.abs(p.y - player.y) < 10) {
+    if (!p.got && Math.abs(p.x - player.x) < 13 && Math.abs(p.y - player.y) < 13) {
       p.got = true; got++; updateCount();
       jingle([880, 1175]);
       if (got === total) { unlocked = true; setTimeout(() => { toast(L.unlock); jingle([523, 659, 784, 1047]); }, 350); }
