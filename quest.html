@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kounouz's Little Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Nunito:wght@500;700;800&family=Amiri:wght@700&display=swap">
+<style>
+/* Layout: a handheld console. Status strip on top, the pixel world in the middle at integer scale,
+   a chunky D-pad underneath on phones. Story moments open as dialogue boxes over the world. */
+:root {
+  --shell: #ffe3ec;
+  --plum: #3b1f3a;
+  --berry: #ff4f86;
+  --cream: #fff8f0;
+  --mint: #5cc79c;
+  --soft: #b58aa6;
+  --pixel: "Pixelify Sans", "Courier New", ui-monospace, monospace;
+  --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--shell); color: var(--plum);
+  font-family: var(--body); font-size: 16px; line-height: 1.5;
+  overflow: hidden; -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+}
+[hidden] { display: none !important; }
+
+#stage {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  gap: 10px;
+}
+.hud { display: flex; align-items: center; gap: 10px; font-family: var(--pixel); }
+.hud .lvl { min-width: 0; flex: 1; }
+.hud .lvl small { display: block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); }
+.hud .lvl b { display: block; font-size: 20px; line-height: 1.1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.count {
+  font: 700 16px var(--pixel); font-variant-numeric: tabular-nums;
+  background: var(--cream); border: 3px solid var(--plum); border-radius: 10px;
+  padding: 4px 10px; white-space: nowrap;
+  box-shadow: 0 3px 0 var(--plum);
+}
+.icon-btn {
+  width: 40px; height: 40px; flex: none;
+  border: 3px solid var(--plum); border-radius: 10px; background: var(--cream); color: var(--plum);
+  font: 700 16px var(--pixel); cursor: pointer; box-shadow: 0 3px 0 var(--plum);
+}
+.world { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
+canvas#screen {
+  display: block; image-rendering: pixelated; image-rendering: crisp-edges;
+  border: 4px solid var(--plum); border-radius: 12px;
+  box-shadow: 0 6px 0 var(--plum), 0 18px 40px rgba(59, 31, 58, .25);
+  background: var(--plum);
+}
+.toast {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+  width: max-content; max-width: min(92%, 340px);
+  background: var(--plum); color: var(--cream);
+  font: 600 15px var(--pixel); text-align: center;
+  padding: 8px 14px; border-radius: 10px;
+  pointer-events: none; animation: toast 2.4s ease forwards;
+}
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, -6px); } 10%, 82% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+
+/* dialogue */
+.talk {
+  position: absolute; left: 8px; right: 8px; bottom: 8px;
+  background: var(--cream); border: 4px solid var(--plum); border-radius: 12px;
+  box-shadow: 0 5px 0 var(--plum);
+  padding: 12px 14px 12px; cursor: pointer;
+  display: grid; gap: 4px;
+}
+.talk .who { font: 700 14px var(--pixel); color: var(--berry); text-transform: uppercase; letter-spacing: .08em; }
+.talk .line { font: 600 17px/1.35 var(--pixel); min-height: 2.7em; }
+.talk .more { justify-self: end; font: 700 12px var(--pixel); color: var(--soft); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* d-pad */
+.pad { display: flex; justify-content: center; }
+.dpad { display: grid; grid-template-columns: repeat(3, 62px); grid-template-rows: repeat(3, 54px); gap: 4px; touch-action: none; }
+.dpad button {
+  border: 3px solid var(--plum); border-radius: 12px; background: var(--cream); color: var(--plum);
+  font: 700 22px var(--pixel); box-shadow: 0 4px 0 var(--plum); touch-action: none; cursor: pointer;
+}
+.dpad button.on { transform: translateY(3px); box-shadow: 0 1px 0 var(--plum); background: #ffd0de; }
+.dpad .u { grid-column: 2; grid-row: 1; }
+.dpad .l { grid-column: 1; grid-row: 2; }
+.dpad .r { grid-column: 3; grid-row: 2; }
+.dpad .d { grid-column: 2; grid-row: 3; }
+.keys-hint { display: none; text-align: center; font: 600 14px var(--pixel); color: var(--soft); }
+@media (hover: hover) and (pointer: fine) {
+  .pad { display: none; }
+  .keys-hint { display: block; }
+}
+
+/* screens */
+.screen {
+  position: fixed; inset: 0; z-index: 10;
+  display: grid; place-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 20px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  overflow-y: auto; background: rgba(255, 227, 236, .94);
+  animation: fade .4s ease both;
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.card {
+  width: 100%; max-width: 420px;
+  background: var(--cream); border: 4px solid var(--plum); border-radius: 16px;
+  box-shadow: 0 8px 0 var(--plum);
+  padding: 26px 22px; display: flex; flex-direction: column; gap: 14px;
+}
+.card.center { text-align: center; align-items: center; }
+.tag { font: 700 13px var(--pixel); letter-spacing: .12em; text-transform: uppercase; color: var(--berry); }
+h1, h2 { margin: 0; font-family: var(--pixel); font-weight: 700; line-height: 1.05; text-wrap: balance; }
+h1 { font-size: clamp(38px, 11vw, 52px); }
+h2 { font-size: clamp(28px, 8vw, 36px); }
+h1 em, h2 em { font-style: normal; color: var(--berry); }
+p { margin: 0; }
+.muted { color: var(--soft); font-size: 14px; font-weight: 700; }
+.btn {
+  align-self: flex-start;
+  border: 3px solid var(--plum); border-radius: 12px; cursor: pointer;
+  padding: 12px 22px; background: var(--berry); color: var(--cream);
+  font: 700 18px var(--pixel); box-shadow: 0 5px 0 var(--plum);
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--plum); }
+.btn.alt { background: var(--cream); color: var(--plum); }
+.card.center .btn { align-self: center; }
+.btn:focus-visible, .icon-btn:focus-visible, .coupon:focus-visible, .dpad button:focus-visible { outline: 3px solid var(--mint); outline-offset: 3px; }
+.cast { display: flex; gap: 16px; justify-content: center; }
+.cast canvas { width: 80px; height: 112px; image-rendering: pixelated; }
+.levels { display: grid; gap: 6px; padding: 0; margin: 0; list-style: none; font: 600 15px var(--pixel); }
+.levels li { display: flex; gap: 10px; }
+.levels li span:first-child { color: var(--berry); min-width: 1.4em; }
+
+.reward { border: 3px dashed var(--berry); border-radius: 12px; padding: 12px 14px; font: 700 17px var(--pixel); }
+.reward small { display: block; font: 700 12px var(--body); color: var(--soft); letter-spacing: .08em; text-transform: uppercase; }
+
+.arabic { font-family: "Amiri", "Noto Naskh Arabic", "Geeza Pro", serif; font-size: 30px; line-height: 1.3; color: var(--berry); direction: rtl; }
+.polaroid {
+  width: min(62%, 210px); margin: 0; padding: 9px 9px 32px; background: #fff;
+  border: 3px solid var(--plum); transform: rotate(-3deg); position: relative;
+}
+.polaroid img { display: block; width: 100%; max-width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+.polaroid figcaption { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font: 700 14px var(--pixel); }
+.letter { display: grid; gap: 10px; text-align: left; font-weight: 700; }
+.sign { font: 700 24px var(--pixel); color: var(--berry); }
+.coupons { display: grid; gap: 10px; width: 100%; }
+.coupon {
+  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; text-align: left;
+  background: #fff; border: 3px dashed var(--plum); border-radius: 12px; padding: 10px 12px;
+  font: 700 15px var(--pixel); color: var(--plum); cursor: pointer;
+}
+.coupon small { display: block; font: 700 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--soft); }
+.coupon .stamp { font: 700 12px var(--pixel); border: 2px solid var(--berry); color: var(--berry); border-radius: 8px; padding: 3px 8px; }
+.coupon.claimed { border-style: solid; border-color: var(--berry); background: #fff0f5; }
+.coupon.claimed .stamp { background: var(--berry); color: #fff; transform: rotate(-6deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast, .screen { animation-duration: .01s; }
+  .talk .more { animation: none; }
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="hud">
+    <div class="lvl"><small id="lvlNo">Level 1 of 4</small><b id="lvlName">Café Kounouz</b></div>
+    <div class="count" id="count">0/5</div>
+    <button class="icon-btn" id="mute" type="button" aria-label="Turn music off">♪</button>
+  </div>
+  <div class="world" id="world">
+    <canvas id="screen" aria-label="Game world"></canvas>
+    <div id="toastLayer"></div>
+    <div class="talk" id="talk" hidden role="dialog" aria-live="polite">
+      <div class="who" id="who"></div>
+      <div class="line" id="line"></div>
+      <div class="more">tap ▸</div>
+    </div>
+  </div>
+  <div class="pad">
+    <div class="dpad" id="dpad">
+      <button class="u" data-dir="up" type="button" aria-label="Up">▲</button>
+      <button class="l" data-dir="left" type="button" aria-label="Left">◀</button>
+      <button class="r" data-dir="right" type="button" aria-label="Right">▶</button>
+      <button class="d" data-dir="down" type="button" aria-label="Down">▼</button>
+    </div>
+  </div>
+  <div class="keys-hint">Move with the arrow keys or WASD · Space to talk</div>
+</div>
+
+<!-- title -->
+<section class="screen" id="title">
+  <div class="card">
+    <div class="tag">A game starring one person</div>
+    <h1><em>Kounouz</em>'s Little Quest</h1>
+    <div class="cast"><canvas id="castK" width="10" height="14"></canvas><canvas id="castR" width="10" height="14"></canvas></div>
+    <p>Rabie hid a few things around town for you. Find them all and follow the path to the end. He's waiting there.</p>
+    <ol class="levels" id="levelList"></ol>
+    <p class="muted">Every level you finish unlocks a real gift. Watch out for pigeons, scooters and a very jealous bee.</p>
+    <button class="btn" id="play" type="button">Start ▸</button>
+  </div>
+</section>
+
+<!-- level clear -->
+<section class="screen" id="clear" hidden>
+  <div class="card center">
+    <div class="tag" id="clearTag">Level 1 complete</div>
+    <h2 id="clearTitle">Bravo, kanouzti!</h2>
+    <div class="reward"><small>Real gift unlocked</small><span id="clearReward"></span></div>
+    <p class="muted">Screenshot it. Rabie has to honor it.</p>
+    <button class="btn" id="nextLvl" type="button">Next level ▸</button>
+  </div>
+</section>
+
+<!-- finale -->
+<section class="screen" id="finale" hidden>
+  <div class="card center">
+    <div class="tag">Quest complete</div>
+    <div class="arabic">نحبك برشا يا كنوزتي</div>
+    <figure class="polaroid"><img id="photo" alt="Kounouz smiling"><figcaption>player one ♥</figcaption></figure>
+    <div class="letter" id="letter"></div>
+    <div class="sign" id="sign"></div>
+    <div class="tag" style="margin-top:6px">Your loot · tap to claim</div>
+    <div class="coupons" id="coupons"></div>
+    <button class="btn alt" id="replay" type="button">Play again</button>
+  </div>
+</section>
+
+<script>
+/* ============================================================
+   EDIT HERE: names, lines, rewards. Maps are 11 x 15 tiles.
+   # wall   T table   w sea   D blue door   = road   . floor
+   S start  c item    p pigeon/cat   b bee   N friend   R Rabie   E exit
+   ============================================================ */
+const CONFIG = {
+  name: "Kounouz",
+  from: "Rabie",
+  photo: "assets/kounouz.jpg",
+  compliments: [
+    "Prettiest player ever", "Enti kenzi ♥", "Your smile = cheat code", "Rabie is so proud",
+    "Nhebbek barcha", "Too cute to lose", "Legendary", "Kanouzti!!", "My favorite person",
+    "Still the cutest", "Unstoppable", "That laugh though", "Queen behaviour", "Hlowa, enti"
+  ],
+  levels: [
+    {
+      name: "Café Kounouz", theme: "cafe", item: "matcha", enemy: "pigeon",
+      map: [
+        "###########",
+        "#N...#....#",
+        "#....#.c..#",
+        "#.c.......#",
+        "#...TT..T.#",
+        "#.p.TT..T.#",
+        "#.........#",
+        "#.T..c..p.#",
+        "#.T.......#",
+        "#....TTT..#",
+        "#.c..TTT.c#",
+        "#.........#",
+        "#..T...T..#",
+        "#S...p...E#",
+        "###########"
+      ],
+      intro: [
+        ["Note on the fridge", "Good morning Kounouz. Follow the path, collect what I hid, and come find me. ♥ Rabie"],
+        ["Level 1", "The café. Collect all 5 matchas. The pigeons are jealous of you, so stay away from them."]
+      ],
+      npc: ["Barista", "Rabie called ahead. He said: \"Make it perfect, it's for the prettiest girl in the world.\""],
+      unlock: "All matchas! The door is open ▸",
+      reward: "A matcha date, Rabie's treat"
+    },
+    {
+      name: "Pizza Street", theme: "street", item: "pizza", enemy: "scooter",
+      map: [
+        "#####E#####",
+        "#c..N....c#",
+        "#=========#",
+        "#=========#",
+        "#.........#",
+        "#..##c##..#",
+        "#=========#",
+        "#=========#",
+        "#.c.....c.#",
+        "#=========#",
+        "#=========#",
+        "#.........#",
+        "#.........#",
+        "#....S....#",
+        "###########"
+      ],
+      lanes: [
+        { row: 2, dir: 1, speed: 34, count: 2 }, { row: 3, dir: -1, speed: 46, count: 2 },
+        { row: 6, dir: 1, speed: 58, count: 2 }, { row: 7, dir: -1, speed: 40, count: 3 },
+        { row: 9, dir: 1, speed: 50, count: 2 }, { row: 10, dir: -1, speed: 66, count: 2 }
+      ],
+      intro: [["Level 2", "Pizza Street! Grab all 5 slices and cross to the top. Nobody here drives slowly."]],
+      npc: ["Pizzaiolo", "You're Kounouz? Rabie says you always choose the pizza and he always pays. Forever. His words."],
+      unlock: "All slices! Get to the top door ▸",
+      reward: "Pizza night. You choose, Rabie pays"
+    },
+    {
+      name: "Framboise Garden", theme: "garden", item: "framboise", enemy: "bee",
+      map: [
+        "###########",
+        "#c..#...#c#",
+        "#.#.#.#.#.#",
+        "#.#...#...#",
+        "#.###.###.#",
+        "#...#....b#",
+        "###.#.###.#",
+        "#c..#.#c..#",
+        "#.###.#.###",
+        "#.....#...#",
+        "#.#####.#.#",
+        "#.#c....#c#",
+        "#.#.#####.#",
+        "#S..N....E#",
+        "###########"
+      ],
+      intro: [["Level 3", "The Framboise Garden. Find all 6 framboises in the maze. A bee wants them too, but it's slow."]],
+      npc: ["Gardener", "Rabie planted all these framboises for you. Okay, he bought them. Same thing."],
+      unlock: "All framboises! The gate is open ▸",
+      reward: "A tiramisu with framboises on top"
+    },
+    {
+      name: "Sidi Bou Said", theme: "sidi", item: "heart", enemy: "cat",
+      map: [
+        "wwwwwwwwwww",
+        "wwwwwwwwwww",
+        "#....R....#",
+        "#.........#",
+        "##D#...#D##",
+        "#c.#.p.#..#",
+        "#..#...#.c#",
+        "#.....#...#",
+        "#D#.p.#.#D#",
+        "#...#.....#",
+        "#.c.#..p..#",
+        "##D###..###",
+        "#.........#",
+        "#....S....#",
+        "###########"
+      ],
+      intro: [["Level 4", "Sidi Bou Said, sunset. Collect 3 hearts, then go to the sea. Someone is waiting there."]],
+      locked: "Collect the 3 hearts first ♥",
+      unlock: "All hearts! Go find Rabie by the sea ▸",
+      ending: [
+        ["Rabie", "Kounouz! You made it!"],
+        ["Rabie", "Matcha, pizza, framboises, hearts. You found every single thing I hid for you."],
+        ["Rabie", "But honestly? The real treasure in this game is you. That's literally what your name means."],
+        ["Rabie", "Nhebbek barcha, kanouzti. Come here. ♥"]
+      ],
+      reward: "One very long hug and a massage, no time limit"
+    }
+  ],
+  hits: {
+    pigeon: "A pigeon wanted your autograph. Back to the start!",
+    scooter: "Beep beep! Scooter. Try again, ya kanouzti",
+    bee: "Bzz! The bee thinks you're sweeter than framboises",
+    cat: "A cat wanted cuddles. Back to the start!"
+  },
+  letter: [
+    "Kounouz, you played the whole game, and you won. You always do.",
+    "You make my days softer, my laugh louder and my life a lot more beautiful.",
+    "Thank you for being you. I love you more than matcha, pizza and tiramisu combined. Nhebbek barcha."
+  ]
+};
+/* ============================================================ */
+
+const $ = id => document.getElementById(id);
+const T = 16, COLS = 11, ROWS = 15, LW = COLS * T, LH = ROWS * T;
+const SPEED = 62;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const screen = $("screen"), sctx = screen.getContext("2d");
+const buf = document.createElement("canvas"); buf.width = LW; buf.height = LH;
+let b = buf.getContext("2d");
+
+/* ---------- sprites ---------- */
+const K_PAL = { h: "#3b2219", H: "#5e3826", s: "#f1c7a5", e: "#2b1a14", m: "#d9667f", t: "#ff6f9f", j: "#5a6fc0", f: "#3b2a3a", w: "#ffffff" };
+const R_PAL = { h: "#1f1a17", s: "#deae88", e: "#1f1a17", m: "#b8665c", t: "#3d7dd6", j: "#2c3550", f: "#f4f4f4" };
+const KOUNOUZ = [
+  "..hhhhhh..",
+  ".hHhhhhhh.",
+  "hhsssssshh",
+  "hhsesseshh",
+  "hhsssssshh",
+  "hhssmmsshh",
+  "hhhssssHhh",
+  "hhttttttHh",
+  "h.tttttt.h",
+  "s.tttttt.s",
+  "..tttttt..",
+  "..jjjjjj..",
+  "..jj..jj..",
+  "..ff..ff.."
+];
+const RABIE = [
+  "..hhhhhh..",
+  ".hhhhhhhh.",
+  ".hssssssh.",
+  ".sesssses.",
+  ".ssssssss.",
+  ".ssmmmmss.",
+  "..ssssss..",
+  ".tttttttt.",
+  "tttttttttt",
+  "s.tttttt.s",
+  "..tttttt..",
+  "..jjjjjj..",
+  "..jj..jj..",
+  "..ff..ff.."
+];
+const STEP_LEGS = ["..jj...jj.", ".ff....ff."];
+function pose(rows, dir, step) {
+  let r = rows.slice();
+  if (dir === "up") r = r.map((row, i) => i >= 2 && i <= 5 ? row.replace(/[sem]/g, "h") : row);
+  if (step) { r[12] = STEP_LEGS[0]; r[13] = STEP_LEGS[1]; }
+  return r;
+}
+const ITEMS = {
+  matcha: { pal: { s: "#e6e6ee", G: "#a8db7a", w: "#ffffff", h: "#ffffff", g: "#6fb04a" }, rows: ["..s..s..", ".s..s...", "wGGGGGw.", "wwwwwwwh", "wwwwwwwh", ".wwwww.."] },
+  pizza: { pal: { b: "#c47a35", y: "#ffd25a", R: "#e0413b" }, rows: ["bbbbbbb", "yyRyyyy", ".yyyRy.", "..yRy..", "...y..."] },
+  framboise: { pal: { l: "#4fae4f", r: "#e8306a", R: "#ff7aa0" }, rows: ["..ll..", ".rrrr.", "rrRrrr", "rrrrRr", ".rRrr.", "..rr.."] },
+  heart: { pal: { r: "#ff4f86", w: "#ffd0de" }, rows: [".rr.rr.", "rwrrrrr", "rrrrrrr", ".rrrrr.", "..rrr..", "...r..."] }
+};
+const ENEMIES = {
+  pigeon: { pal: { g: "#8c90a6", G: "#b9bccc", k: "#1d1d2a", o: "#f0a043" }, rows: ["..ggg...", "oggkg...", ".ggggg..", "gGGGGgg.", ".gggggg.", "..o..o.."] },
+  cat: { pal: { k: "#e8933a", e: "#2a2a2a", p: "#ff8fb1" }, rows: ["k.....k.", "kk...kk.", "kkkkkkk.", "kekkekk.", "kkkpkkk.", ".kkkkk..", ".k...k.."] },
+  bee: { pal: { w: "#e8f4ff", y: "#ffcf3a", k: "#2a2333" }, rows: [".ww.ww..", ".wwwww..", "yykyyk..", "yykyyky.", ".ykyyk.."] }
+};
+function spr(ctx, rows, pal, cx, by, flip) {
+  const w = rows[0].length, h = rows.length;
+  const x0 = Math.round(cx - w / 2), y0 = Math.round(by - h);
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
+    const ch = rows[r][flip ? w - 1 - c : c];
+    if (ch === "." || !pal[ch]) continue;
+    ctx.fillStyle = pal[ch]; ctx.fillRect(x0 + c, y0 + r, 1, 1);
+  }
+}
+function shadow(cx, y, w) { b.fillStyle = "rgba(40,20,40,.22)"; b.fillRect(Math.round(cx - w / 2), Math.round(y), w, 2); }
+
+/* ---------- tiles ---------- */
+const hash = (x, y) => (((x * 73856093) ^ (y * 19349663)) >>> 0) % 100;
+const THEMES = {
+  cafe: {
+    floor(x, y) { b.fillStyle = (x + y) % 2 ? "#f3d9b1" : "#ebc996"; b.fillRect(x * T, y * T, T, T); },
+    wall(x, y, ch) {
+      const X = x * T, Y = y * T;
+      if (ch === "T") {
+        this.floor(x, y);
+        b.fillStyle = "#8a5634"; b.fillRect(X + 1, Y + 2, 14, 13);
+        b.fillStyle = "#c98b5e"; b.fillRect(X + 1, Y + 1, 14, 11);
+        b.fillStyle = "#dca57a"; b.fillRect(X + 2, Y + 2, 12, 2);
+        if (hash(x, y) < 45) { b.fillStyle = "#fff"; b.fillRect(X + 6, Y + 5, 4, 3); b.fillStyle = "#7a4a2a"; b.fillRect(X + 7, Y + 5, 2, 1); }
+        return;
+      }
+      b.fillStyle = "#7a4a36"; b.fillRect(X, Y, T, T);
+      b.fillStyle = "#94604a"; b.fillRect(X, Y, T, 3);
+      b.fillStyle = "#653c2c"; b.fillRect(X + 7, Y + 3, 1, 13);
+    }
+  },
+  street: {
+    floor(x, y, ch) {
+      const X = x * T, Y = y * T;
+      if (ch === "=") {
+        b.fillStyle = "#4b4b5c"; b.fillRect(X, Y, T, T);
+        if (grid[y - 1]?.[x] === "=" && x % 2) { b.fillStyle = "#f4f0e6"; b.fillRect(X + 3, Y, 10, 1); }
+        return;
+      }
+      b.fillStyle = "#ddd6cc"; b.fillRect(X, Y, T, T);
+      b.fillStyle = "#cbc3b8"; b.fillRect(X, Y + 15, T, 1); b.fillRect(X + 15, Y, 1, T);
+    },
+    wall(x, y) {
+      const X = x * T, Y = y * T;
+      b.fillStyle = "#e8a87c"; b.fillRect(X, Y, T, T);
+      b.fillStyle = "#c98a60"; b.fillRect(X, Y + 14, T, 2);
+      b.fillStyle = "#fff4e6"; b.fillRect(X + 4, Y + 3, 8, 7);
+      b.fillStyle = "#7fb8d6"; b.fillRect(X + 5, Y + 4, 6, 5);
+    }
+  },
+  garden: {
+    floor(x, y) {
+      const X = x * T, Y = y * T;
+      b.fillStyle = (x + y) % 2 ? "#9ad884" : "#8fcf78"; b.fillRect(X, Y, T, T);
+      const h = hash(x, y);
+      if (h < 18) { b.fillStyle = h < 9 ? "#fff" : "#ffd25a"; b.fillRect(X + 3 + (h % 8), Y + 4 + (h % 7), 2, 2); }
+    },
+    wall(x, y) {
+      const X = x * T, Y = y * T;
+      b.fillStyle = "#2f7240"; b.fillRect(X, Y, T, T);
+      b.fillStyle = "#3f8f4f"; b.fillRect(X, Y, T, 12);
+      b.fillStyle = "#5aac68"; b.fillRect(X + 2, Y + 2, 4, 3); b.fillRect(X + 9, Y + 5, 4, 3);
+      if (hash(x, y) < 30) { b.fillStyle = "#e8306a"; b.fillRect(X + 6, Y + 8, 2, 2); }
+    }
+  },
+  sidi: {
+    floor(x, y) {
+      const X = x * T, Y = y * T;
+      b.fillStyle = "#f4efe6"; b.fillRect(X, Y, T, T);
+      b.fillStyle = "#e5dccd"; b.fillRect(X, Y + 7, T, 1); b.fillRect(X + (y % 2 ? 4 : 11), Y, 1, 7); b.fillRect(X + (y % 2 ? 11 : 4), Y + 8, 1, 8);
+    },
+    wall(x, y, ch) {
+      const X = x * T, Y = y * T;
+      if (ch === "w") return;
+      b.fillStyle = "#ffffff"; b.fillRect(X, Y, T, T);
+      b.fillStyle = "#d9dee8"; b.fillRect(X, Y + 13, T, 3);
+      if (ch === "D") {
+        b.fillStyle = "#2f6db5"; b.fillRect(X + 3, Y + 3, 10, 13); b.fillRect(X + 4, Y + 2, 8, 1);
+        b.fillStyle = "#1d4f8a"; b.fillRect(X + 8, Y + 3, 1, 13);
+        b.fillStyle = "#ffd25a"; b.fillRect(X + 5, Y + 9, 1, 1); b.fillRect(X + 10, Y + 9, 1, 1);
+        return;
+      }
+      b.fillStyle = "#2f6db5"; b.fillRect(X, Y, T, 2);
+      if (hash(x, y) < 40) { b.fillStyle = "#e04b8f"; b.fillRect(X + 2, Y + 3, 3, 3); b.fillRect(X + 4, Y + 5, 2, 2); b.fillStyle = "#4fae4f"; b.fillRect(X + 6, Y + 4, 2, 1); }
+    }
+  }
+};
+const SOLID = "#TwDNR";
+
+/* ---------- level state ---------- */
+let li = 0, L, grid, theme, tileLayer, start, pickups, walkers, bees, scooters, npc, rabie, exit, total, got, unlocked;
+let player, invuln = 0, state = "title", t0 = 0;
+
+function load(i) {
+  li = i; L = CONFIG.levels[i]; theme = THEMES[L.theme];
+  grid = L.map.map(r => r.split(""));
+  pickups = []; walkers = []; bees = []; scooters = []; npc = rabie = exit = null;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const ch = grid[y][x], cx = x * T + 8, cy = y * T + 8;
+    if (ch === "S") { start = { x: cx, y: cy }; grid[y][x] = "."; }
+    else if (ch === "c") { pickups.push({ x: cx, y: cy, got: false, ph: Math.random() * 6 }); grid[y][x] = "."; }
+    else if (ch === "p") { walkers.push({ x: cx, y: cy, sx: cx, sy: cy, d: null, t: 0 }); grid[y][x] = "."; }
+    else if (ch === "b") { bees.push({ x: cx, y: cy, sx: cx, sy: cy }); grid[y][x] = "."; }
+    else if (ch === "N") npc = { x: cx, y: cy, talked: false };
+    else if (ch === "R") rabie = { x: cx, y: cy };
+    else if (ch === "E") exit = { x: cx, y: cy, tx: x, ty: y };
+  }
+  for (const ln of L.lanes || []) for (let k = 0; k < ln.count; k++) {
+    scooters.push({ x: k * (LW + 40) / ln.count - 20, y: ln.row * T + 8, dir: ln.dir, speed: ln.speed });
+  }
+  total = pickups.length; got = 0; unlocked = false;
+  player = { x: start.x, y: start.y, dir: "up", moving: false, anim: 0 };
+  invuln = 0;
+  bakeTiles();
+  $("lvlNo").textContent = `Level ${i + 1} of ${CONFIG.levels.length}`;
+  $("lvlName").textContent = L.name;
+  updateCount();
+}
+function bakeTiles() {
+  tileLayer = document.createElement("canvas"); tileLayer.width = LW; tileLayer.height = LH;
+  const real = b; b = tileLayer.getContext("2d");
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const ch = grid[y][x];
+    if ("#TwD".includes(ch)) theme.wall(x, y, ch);
+    else theme.floor(x, y, ch === "N" || ch === "R" || ch === "E" ? "." : ch);
+  }
+  b = real;
+}
+function updateCount() { $("count").textContent = `${ITEM_ICON[L.item]} ${got}/${total}`; }
+const ITEM_ICON = { matcha: "🍵", pizza: "🍕", framboise: "🍓", heart: "♥" };
+
+function solidAt(px, py) {
+  const cx = Math.floor(px / T), cy = Math.floor(py / T);
+  if (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) return true;
+  const c = grid[cy][cx];
+  if (c === "E") return !unlocked;
+  return SOLID.includes(c);
+}
+function boxFree(x, y, h = 5) {
+  return !solidAt(x - h, y - h) && !solidAt(x + h - .01, y - h) && !solidAt(x - h, y + h - .01) && !solidAt(x + h - .01, y + h - .01);
+}
+
+/* ---------- input ---------- */
+const held = [];
+const VEC = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+function press(d) { if (!held.includes(d)) held.push(d); }
+function release(d) { const i = held.indexOf(d); if (i >= 0) held.splice(i, 1); }
+const KEYMAP = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right", W: "up", S: "down", A: "left", D: "right" };
+addEventListener("keydown", e => {
+  if (state === "talk" && (e.key === " " || e.key === "Enter")) { e.preventDefault(); advance(); return; }
+  const d = KEYMAP[e.key]; if (d) { e.preventDefault(); press(d); }
+});
+addEventListener("keyup", e => { const d = KEYMAP[e.key]; if (d) release(d); });
+addEventListener("blur", () => held.length = 0);
+for (const btn of document.querySelectorAll(".dpad button")) {
+  const d = btn.dataset.dir;
+  btn.addEventListener("pointerdown", e => { e.preventDefault(); btn.setPointerCapture?.(e.pointerId); press(d); btn.classList.add("on"); });
+  const up = () => { release(d); btn.classList.remove("on"); };
+  btn.addEventListener("pointerup", up); btn.addEventListener("pointercancel", up); btn.addEventListener("lostpointercapture", up);
+  btn.addEventListener("contextmenu", e => e.preventDefault());
+}
+
+/* ---------- dialogue ---------- */
+let queue = [], onDone = null, typing = null, full = "";
+function talk(lines, done) { state = "talk"; queue = lines.slice(); onDone = done; held.length = 0; clearPad(); nextLine(); }
+function nextLine() {
+  if (!queue.length) { $("talk").hidden = true; state = "play"; const f = onDone; onDone = null; f?.(); return; }
+  const [who, text] = queue.shift();
+  $("who").textContent = who; full = text; $("talk").hidden = false;
+  if (reduceMotion) { $("line").textContent = text; typing = null; return; }
+  let n = 0; $("line").textContent = "";
+  clearInterval(typing);
+  typing = setInterval(() => {
+    n += 1; $("line").textContent = full.slice(0, n);
+    if (n % 3 === 0) blip(700 + Math.random() * 200, .03, "square", .02);
+    if (n >= full.length) { clearInterval(typing); typing = null; }
+  }, 28);
+}
+function advance() {
+  if (typing) { clearInterval(typing); typing = null; $("line").textContent = full; return; }
+  nextLine();
+}
+$("talk").addEventListener("click", advance);
+function clearPad() { document.querySelectorAll(".dpad button").forEach(x => x.classList.remove("on")); }
+
+/* ---------- toasts ---------- */
+let ci = 0;
+function toast(text) {
+  const el = document.createElement("div"); el.className = "toast"; el.textContent = text;
+  $("toastLayer").replaceChildren(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+/* ---------- sound ---------- */
+let audio = null, muted = false, musicTimer = null, beat = 0;
+function blip(f, len, type = "square", vol = .05, when = 0) {
+  if (!audio || muted) return;
+  const at = audio.currentTime + when;
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, at);
+  g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(.0001, at + len);
+  o.connect(g).connect(audio.destination); o.start(at); o.stop(at + len + .02);
+}
+const jingle = notes => notes.forEach((f, i) => blip(f, .18, "square", .05, i * .09));
+const MELODY = [523, 659, 784, 659, 587, 698, 880, 698, 523, 659, 784, 1047, 988, 784, 659, 587];
+const BASS = [131, 131, 175, 175, 131, 131, 196, 196];
+function startMusic() {
+  if (musicTimer) return;
+  musicTimer = setInterval(() => {
+    if (muted || !audio || state === "title") return;
+    blip(MELODY[beat % 16], .16, "triangle", .035);
+    if (beat % 2 === 0) blip(BASS[(beat / 2) % 8], .3, "triangle", .05);
+    beat++;
+  }, 220);
+}
+$("mute").addEventListener("click", () => {
+  muted = !muted; $("mute").textContent = muted ? "×" : "♪";
+  $("mute").setAttribute("aria-label", muted ? "Turn music on" : "Turn music off");
+});
+
+/* ---------- update ---------- */
+function moveWalker(w, dt) {
+  w.t -= dt;
+  if (w.t <= 0 || !w.d) { const ds = ["up", "down", "left", "right", null]; w.d = ds[(Math.random() * 5) | 0]; w.t = .8 + Math.random() * 1.4; }
+  if (!w.d) return;
+  const [dx, dy] = VEC[w.d], s = 22 * dt;
+  const nx = w.x + dx * s, ny = w.y + dy * s;
+  if (boxFree(nx, ny, 5)) { w.x = nx; w.y = ny; w.flip = dx > 0; } else w.t = 0;
+}
+function hit() {
+  invuln = 1.6;
+  blip(180, .25, "sawtooth", .05); blip(120, .3, "sawtooth", .04, .1);
+  toast(CONFIG.hits[L.enemy]);
+  player.x = start.x; player.y = start.y;
+  for (const bee of bees) { bee.x = bee.sx; bee.y = bee.sy; }
+  held.length = 0; clearPad();
+}
+let lockedToastAt = 0;
+function update(dt, now) {
+  // player
+  const d = held[held.length - 1];
+  player.moving = !!d;
+  if (d) {
+    player.dir = d;
+    const [dx, dy] = VEC[d], s = SPEED * dt;
+    if (dx) {
+      const nx = player.x + dx * s; if (boxFree(nx, player.y)) player.x = nx;
+      const cy = Math.floor(player.y / T) * T + 8, off = cy - player.y;
+      const ny = player.y + Math.sign(off) * Math.min(Math.abs(off), s); if (boxFree(player.x, ny)) player.y = ny;
+    } else {
+      const ny = player.y + dy * s; if (boxFree(player.x, ny)) player.y = ny;
+      const cx = Math.floor(player.x / T) * T + 8, off = cx - player.x;
+      const nx = player.x + Math.sign(off) * Math.min(Math.abs(off), s); if (boxFree(nx, player.y)) player.x = nx;
+    }
+    player.anim += dt;
+  }
+  if (invuln > 0) invuln -= dt;
+
+  // enemies
+  for (const w of walkers) moveWalker(w, dt);
+  for (const bee of bees) {
+    const vx = player.x - bee.x, vy = player.y - bee.y, dist = Math.hypot(vx, vy) || 1;
+    bee.x += vx / dist * 24 * dt; bee.y += vy / dist * 24 * dt; bee.flip = vx > 0;
+  }
+  for (const sc of scooters) {
+    sc.x += sc.dir * sc.speed * dt;
+    if (sc.dir > 0 && sc.x > LW + 20) sc.x = -20;
+    if (sc.dir < 0 && sc.x < -20) sc.x = LW + 20;
+  }
+  if (invuln <= 0) {
+    for (const w of walkers) if (Math.abs(w.x - player.x) < 9 && Math.abs(w.y - player.y) < 9) return hit();
+    for (const bee of bees) if (Math.hypot(bee.x - player.x, bee.y - player.y) < 9) return hit();
+    for (const sc of scooters) if (Math.abs(sc.x - player.x) < 11 && Math.abs(sc.y - player.y) < 8) return hit();
+  }
+
+  // pickups
+  for (const p of pickups) {
+    if (!p.got && Math.abs(p.x - player.x) < 10 && Math.abs(p.y - player.y) < 10) {
+      p.got = true; got++; updateCount();
+      jingle([880, 1175]);
+      if (got === total) { unlocked = true; setTimeout(() => { toast(L.unlock); jingle([523, 659, 784, 1047]); }, 350); }
+      else toast(CONFIG.compliments[ci++ % CONFIG.compliments.length]);
+    }
+  }
+
+  // people & exits
+  if (npc && !npc.talked && Math.hypot(npc.x - player.x, npc.y - player.y) < 19) {
+    npc.talked = true; return talk([L.npc]);
+  }
+  if (rabie && !rabie.met && Math.hypot(rabie.x - player.x, rabie.y - player.y) < 19) {
+    if (!unlocked) { if (now - lockedToastAt > 2600) { lockedToastAt = now; toast(L.locked); } }
+    else { rabie.met = true; state = "ending"; return talk(L.ending, finale); }
+  }
+  if (exit && unlocked && Math.abs(exit.x - player.x) < 8 && Math.abs(exit.y - player.y) < 8) levelClear();
+}
+
+/* ---------- render ---------- */
+function render(now) {
+  const tm = now / 1000;
+  b.drawImage(tileLayer, 0, 0);
+  // animated sea
+  if (L.theme === "sidi") {
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (grid[y][x] === "w") {
+      b.fillStyle = y === 0 ? "#2f7fc8" : "#3a8fd6"; b.fillRect(x * T, y * T, T, T);
+      const o = Math.floor((tm * 6 + x * 5 + y * 9) % 16);
+      b.fillStyle = "#8cc8f2"; b.fillRect(x * T + o % 12, y * T + 5 + (y * 3) % 6, 4, 1);
+    }
+    b.fillStyle = "#ffb36b"; b.fillRect(LW - 34, 4, 12, 2); b.fillRect(LW - 36, 6, 16, 3); // sunset on the water
+  }
+  // exit door
+  if (exit) {
+    const X = exit.tx * T, Y = exit.ty * T;
+    b.fillStyle = "#3b1f3a"; b.fillRect(X + 1, Y, 14, 16);
+    if (unlocked) {
+      const pulse = reduceMotion ? 1 : .6 + .4 * Math.sin(tm * 5);
+      b.fillStyle = `rgba(255,214,120,${pulse})`; b.fillRect(X + 3, Y + 2, 10, 14);
+      b.fillStyle = "#ff4f86"; b.fillRect(X + 6, Y + 6, 4, 3); b.fillRect(X + 7, Y + 9, 2, 1);
+    } else {
+      b.fillStyle = "#8a5634"; b.fillRect(X + 3, Y + 2, 10, 14);
+      b.fillStyle = "#ffd25a"; b.fillRect(X + 7, Y + 8, 2, 3);
+    }
+  }
+  // pickups
+  for (const p of pickups) if (!p.got) {
+    const it = ITEMS[L.item], bob = reduceMotion ? 0 : Math.round(Math.sin(tm * 4 + p.ph) * 1.5);
+    shadow(p.x, p.y + 5, 6);
+    spr(b, it.rows, it.pal, p.x, p.y + 4 + bob, false);
+  }
+  // sorted actors
+  const actors = [];
+  if (npc) actors.push({ y: npc.y, draw: () => drawNpc(npc) });
+  if (rabie) actors.push({ y: rabie.y, draw: () => drawRabie(tm) });
+  for (const w of walkers) actors.push({ y: w.y, draw: () => { shadow(w.x, w.y + 4, 7); const e = ENEMIES[L.enemy]; spr(b, e.rows, e.pal, w.x, w.y + 4, w.flip); } });
+  actors.push({ y: player.y, draw: drawPlayer });
+  actors.sort((a, c) => a.y - c.y).forEach(a => a.draw());
+  for (const sc of scooters) drawScooter(sc);
+  for (const bee of bees) {
+    const e = ENEMIES.bee, fy = Math.round(Math.sin(tm * 10) * 1.5);
+    shadow(bee.x, bee.y + 6, 5);
+    spr(b, e.rows, e.pal, bee.x, bee.y + 1 + fy, bee.flip);
+  }
+  // blit
+  sctx.imageSmoothingEnabled = false;
+  sctx.drawImage(buf, 0, 0, screen.width, screen.height);
+}
+function drawPlayer() {
+  if (invuln > 0 && Math.floor(invuln * 10) % 2) return;
+  const step = player.moving && Math.floor(player.anim * 8) % 2;
+  shadow(player.x, player.y + 6, 8);
+  spr(b, pose(KOUNOUZ, player.dir, step), K_PAL, player.x, player.y + 7 - (step ? 1 : 0), player.dir === "left");
+}
+function drawRabie(tm) {
+  shadow(rabie.x, rabie.y + 6, 8);
+  const hop = unlocked && !reduceMotion ? Math.round(Math.abs(Math.sin(tm * 6)) * 2) : 0;
+  spr(b, RABIE, R_PAL, rabie.x, rabie.y + 7 - hop, false);
+  if (unlocked) { const it = ITEMS.heart; spr(b, it.rows, it.pal, rabie.x, rabie.y - 9 - hop, false); }
+}
+const NPC_PAL = { h: "#7a7a7a", s: "#e8b994", e: "#222", m: "#a8564f", t: "#ffffff", j: "#6a5a4a", f: "#333" };
+const NPC_STYLE = { cafe: { t: "#ffffff", h: "#2a1d18" }, street: { t: "#ffffff", h: "#e8e8e8" }, garden: { t: "#7ab55c", h: "#c9c9c9" } };
+function drawNpc(n) {
+  shadow(n.x, n.y + 6, 8);
+  spr(b, RABIE, { ...NPC_PAL, ...NPC_STYLE[L.theme] }, n.x, n.y + 7, false);
+  if (!n.talked) { b.fillStyle = "#3b1f3a"; b.fillRect(n.x - 4, n.y - 14, 9, 7); b.fillStyle = "#fff"; b.fillRect(n.x - 3, n.y - 13, 7, 5); b.fillStyle = "#3b1f3a"; b.fillRect(n.x - 2, n.y - 11, 1, 1); b.fillRect(n.x, n.y - 11, 1, 1); b.fillRect(n.x + 2, n.y - 11, 1, 1); }
+}
+const SCOOTER_COLORS = ["#e0413b", "#3d7dd6", "#ffcf3a", "#5cc79c"];
+function drawScooter(sc) {
+  const x = Math.round(sc.x), y = Math.round(sc.y), f = sc.dir < 0 ? -1 : 1;
+  const col = SCOOTER_COLORS[Math.abs(Math.round(sc.speed + sc.y)) % 4];
+  b.fillStyle = "rgba(0,0,0,.25)"; b.fillRect(x - 7, y + 5, 14, 2);
+  b.fillStyle = "#1d1d2a"; b.fillRect(x - 6, y + 2, 4, 4); b.fillRect(x + 2, y + 2, 4, 4);
+  b.fillStyle = col; b.fillRect(x - 7, y - 1, 14, 4); b.fillRect(x + 3 * f - (f < 0 ? 2 : 0), y - 6, 2, 6);
+  b.fillStyle = "#2a2a2a"; b.fillRect(x - 3, y - 9, 5, 7);   // rider
+  b.fillStyle = "#f4f4f4"; b.fillRect(x - 3, y - 12, 5, 4);  // helmet
+}
+
+/* ---------- flow ---------- */
+function startLevel(i) {
+  load(i);
+  for (const s of ["title", "clear", "finale"]) $(s).hidden = true;
+  state = "play";
+  talk(L.intro);
+}
+function levelClear() {
+  state = "clear"; held.length = 0; clearPad();
+  jingle([523, 659, 784, 1047, 1319]);
+  $("clearTag").textContent = `Level ${li + 1} complete`;
+  $("clearTitle").textContent = ["Bravo, kanouzti!", "Yalla, next!", "You're amazing!"][li % 3];
+  $("clearReward").textContent = L.reward;
+  $("clear").hidden = false;
+  $("nextLvl").focus({ preventScroll: true });
+}
+$("nextLvl").addEventListener("click", () => startLevel(li + 1));
+function finale() {
+  state = "done";
+  jingle([523, 659, 784, 1047, 784, 1047, 1319]);
+  renderCoupons();
+  $("finale").hidden = false;
+}
+$("play").addEventListener("click", () => {
+  if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  audio?.resume?.();
+  startMusic();
+  startLevel(0);
+});
+$("replay").addEventListener("click", () => startLevel(0));
+
+/* ---------- coupons ---------- */
+const STORE = "kounouz-quest-claimed";
+const loadClaimed = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch (e) { return []; } };
+const saveClaimed = l => { try { localStorage.setItem(STORE, JSON.stringify(l)); } catch (e) {} };
+function renderCoupons() {
+  const claimed = loadClaimed();
+  $("coupons").replaceChildren(...CONFIG.levels.map((lv, i) => {
+    const on = claimed.includes(i), el = document.createElement("button");
+    el.type = "button"; el.id = "coupon-" + i; el.className = "coupon" + (on ? " claimed" : "");
+    el.setAttribute("aria-pressed", on);
+    el.innerHTML = `<span><small></small><span class="t"></span></span><span class="stamp">${on ? "Claimed" : "Claim"}</span>`;
+    el.querySelector("small").textContent = `From level ${i + 1} · ${lv.name}`;
+    el.querySelector(".t").textContent = lv.reward;
+    el.addEventListener("click", () => {
+      const l = loadClaimed(), at = l.indexOf(i);
+      if (at >= 0) l.splice(at, 1); else { l.push(i); jingle([880, 1175]); }
+      saveClaimed(l); renderCoupons(); $("coupon-" + i)?.focus();
+    });
+    return el;
+  }));
+}
+
+/* ---------- sizing & boot ---------- */
+function fit() {
+  const w = $("world"), aw = w.clientWidth - 8, ah = w.clientHeight - 14;
+  let s = Math.min(aw / LW, ah / LH);
+  if (s >= 2) s = Math.floor(s * 2) / 2;
+  s = Math.max(.5, s);
+  const dpr = Math.min(devicePixelRatio || 1, 3);
+  screen.style.width = Math.floor(LW * s) + "px"; screen.style.height = Math.floor(LH * s) + "px";
+  screen.width = Math.round(LW * s * dpr); screen.height = Math.round(LH * s * dpr);
+}
+addEventListener("resize", fit);
+
+function drawCast() {
+  for (const [id, rows, pal] of [["castK", KOUNOUZ, K_PAL], ["castR", RABIE, R_PAL]]) {
+    const c = $(id).getContext("2d"); spr(c, rows, pal, 5, 14, false);
+  }
+}
+$("levelList").replaceChildren(...CONFIG.levels.map((lv, i) => {
+  const li2 = document.createElement("li");
+  li2.innerHTML = `<span>${i + 1}</span><span></span>`;
+  li2.lastChild.textContent = lv.name;
+  return li2;
+}));
+$("photo").src = CONFIG.photo;
+$("letter").replaceChildren(...CONFIG.letter.map(t => { const p = document.createElement("p"); p.textContent = t; return p; }));
+$("sign").textContent = "♥ " + CONFIG.from;
+drawCast();
+load(0);
+fit();
+
+let last = 0;
+function loop(now) {
+  const dt = Math.min(.05, (now - (last || now)) / 1000); last = now;
+  if (state === "play") update(dt, now);
+  render(now);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
