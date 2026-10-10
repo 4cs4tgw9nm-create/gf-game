@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Written in Kounouz's Stars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Italiana&family=Jost:wght@400;500;600&family=DM+Mono:wght@400;500&family=Amiri:wght@400;700&display=swap">
+<style>
+/* Layout: a full-screen star chart. The canvas is the sky; a slim chart header sits on top,
+   and each discovered reason rises as a sheet from the bottom like a plate in an old atlas. */
+:root {
+  --void: #0b0a1f;
+  --ink: #efe9ff;
+  --dust: #8d87b8;
+  --halo: #ffd9a8;
+  --rose: #ff8fb1;
+  --sheet: rgba(20, 17, 48, 0.9);
+  --rule: rgba(255, 217, 168, 0.22);
+  --display: "Italiana", "Didot", "Bodoni 72", Georgia, serif;
+  --body: "Jost", "Futura", "Avenir Next", system-ui, sans-serif;
+  --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --arabic: "Amiri", "Noto Naskh Arabic", "Geeza Pro", serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--void); color: var(--ink);
+  font-family: var(--body); font-size: 16px; line-height: 1.55;
+  overflow: hidden; -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+#app { position: fixed; inset: 0; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+/* chart header */
+.chart-head {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 0;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  pointer-events: none;
+}
+.plate { min-width: 0; }
+.plate .no { font: 500 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--dust); }
+.plate .name { font-family: var(--display); font-size: clamp(30px, 8vw, 44px); line-height: 1; color: var(--halo); margin-top: 4px; }
+.plate .gloss { font-size: 14px; color: var(--dust); margin-top: 2px; }
+.icon-btn {
+  pointer-events: auto; flex: none;
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--rule); background: var(--sheet); color: var(--ink);
+  font: 500 14px var(--mono); cursor: pointer;
+}
+.hint {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  text-align: center; font: 400 12px var(--mono); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--dust); pointer-events: none; padding-inline: 16px;
+  transition: opacity .4s ease;
+}
+.dots { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(141, 135, 184, .35); }
+.dots i.on { background: var(--halo); box-shadow: 0 0 8px var(--halo); }
+
+/* overlays */
+.screen {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  overflow-y: auto;
+  background: radial-gradient(ellipse at 50% 40%, rgba(11, 10, 31, .35), rgba(11, 10, 31, .82));
+  animation: fade .8s ease both;
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.card {
+  width: 100%; max-width: 440px;
+  padding: 30px 24px;
+  border: 1px solid var(--rule); border-radius: 4px;
+  background: var(--sheet);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .5);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.card.center { text-align: center; align-items: center; }
+.coords { font: 400 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dust); }
+.arabic { font-family: var(--arabic); font-size: 30px; line-height: 1.2; color: var(--halo); direction: rtl; }
+h1, h2 { margin: 0; font-family: var(--display); font-weight: 400; line-height: 1.02; text-wrap: balance; }
+h1 { font-size: clamp(44px, 12vw, 62px); }
+h2 { font-size: clamp(34px, 9vw, 46px); }
+h1 em, h2 em { font-style: normal; color: var(--halo); }
+p { margin: 0; }
+.muted { color: var(--dust); font-size: 14px; }
+.btn {
+  border: 0; border-radius: 99px; cursor: pointer;
+  padding: 14px 28px;
+  font: 600 15px var(--body); letter-spacing: .04em;
+  color: var(--void); background: var(--halo);
+  box-shadow: 0 0 32px rgba(255, 217, 168, .35);
+  transition: transform .15s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--rule); box-shadow: none; }
+.btn:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* reason sheet */
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: center;
+  padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  animation: up .6s cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sheet .card { gap: 12px; padding: 22px 22px 20px; }
+.reason { font-family: var(--display); font-size: clamp(24px, 6.4vw, 30px); line-height: 1.18; }
+.sheet .row { justify-content: space-between; align-items: center; }
+
+/* the question */
+.ask { position: relative; min-height: 120px; width: 100%; display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; }
+#yes { font-size: 17px; transition: transform .25s ease; }
+#no { position: relative; transition: left .25s ease, top .25s ease, transform .25s ease; }
+#no.loose { position: fixed; z-index: 5; }
+
+/* finale */
+.polaroid {
+  align-self: center; width: min(64%, 220px);
+  padding: 10px 10px 36px; background: var(--ink); border-radius: 2px;
+  transform: rotate(2.5deg); box-shadow: 0 18px 50px rgba(0, 0, 0, .6);
+  position: relative; margin: 0;
+}
+.polaroid img { display: block; width: 100%; max-width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+.polaroid figcaption {
+  position: absolute; left: 0; right: 0; bottom: 8px; text-align: center;
+  font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--void);
+}
+.letter { display: grid; gap: 10px; text-align: left; }
+.sign { font-family: var(--display); font-size: 28px; color: var(--halo); }
+
+@media (prefers-reduced-motion: reduce) {
+  .screen, .sheet { animation-duration: .01s; }
+  #no, #yes, .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="sky" aria-label="Star chart: tap the glowing star to connect each constellation"></canvas>
+
+  <header class="chart-head" id="head" hidden>
+    <div class="plate">
+      <div class="no" id="plateNo">Plate I of V</div>
+      <div class="name" id="plateName">Cor</div>
+      <div class="gloss" id="plateGloss">The Heart</div>
+    </div>
+    <button class="icon-btn" id="mute" type="button" aria-label="Turn sound off">♪</button>
+  </header>
+  <div class="hint" id="hint" hidden>
+    <span id="hintText">Tap the glowing star</span>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <!-- intro -->
+  <section class="screen" id="intro">
+    <div class="card">
+      <div class="coords">Observation log · for Kounouz only</div>
+      <div class="arabic">مكتوب في النجوم</div>
+      <h1>The sky has something to tell you, <em id="nameIntro">Kounouz</em>.</h1>
+      <p>Five constellations are hiding up there. Tap the glowing star, then the next, and draw each one. Every constellation you finish shows you one reason I love you.</p>
+      <p class="muted">No timer. No wrong moves. Turn the sound on if you can.</p>
+      <div class="row"><button class="btn" id="start" type="button">Look up</button></div>
+    </div>
+  </section>
+
+  <!-- reason sheet -->
+  <div class="sheet" id="sheet" hidden>
+    <div class="card">
+      <div class="coords" id="reasonNo">Reason 1 of 5</div>
+      <div class="reason" id="reasonText"></div>
+      <div class="row">
+        <span class="muted" id="reasonFrom"></span>
+        <button class="btn" id="next" type="button">Next constellation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- the question -->
+  <section class="screen" id="question" hidden>
+    <div class="card center">
+      <div class="coords">Final observation</div>
+      <h2><em id="nameAsk">Kounouz</em>, will you stay my favorite star forever?</h2>
+      <div class="ask" id="ask">
+        <button class="btn" id="yes" type="button">Yes</button>
+        <button class="btn ghost" id="no" type="button">No</button>
+      </div>
+      <p class="muted" id="noLine"> </p>
+    </div>
+  </section>
+
+  <!-- finale -->
+  <section class="screen" id="finale" hidden>
+    <div class="card center">
+      <div class="arabic">نحبك برشا يا كنوزتي</div>
+      <figure class="polaroid"><img id="photo" alt="Kounouz smiling"><figcaption>brightest star I know</figcaption></figure>
+      <div class="letter" id="letter"></div>
+      <div class="sign" id="sign"></div>
+      <div class="row" style="justify-content:center">
+        <button class="btn ghost" id="again" type="button">Draw the stars again</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ============================================================
+   EDIT HERE: names, reasons, letter
+   ============================================================ */
+const CONFIG = {
+  name: "Kounouz",
+  from: "Rabie",
+  photo: "assets/kounouz.jpg",
+  // Each constellation: a star-chart name, a gloss, the reason it reveals, and its stars.
+  // Stars are [x, y] in a 0..1 box, tapped in order. A third value names the star the line
+  // comes from (default: the previous one, -1 = no line). close: true links the last star back to the first.
+  constellations: [
+    { name: "Cor", gloss: "The Heart", close: true,
+      reason: "Because your heart is the softest place I know, and you let me live in it.",
+      stars: [[.5,.86],[.24,.62],[.12,.4],[.18,.2],[.34,.13],[.5,.27],[.66,.13],[.82,.2],[.88,.4],[.76,.62]] },
+    { name: "Luna", gloss: "The Crescent", close: true,
+      reason: "Because my nights got calmer the day you came into them, kanouzti.",
+      stars: [[.7,.14],[.45,.12],[.24,.27],[.15,.5],[.24,.73],[.45,.88],[.7,.86],[.5,.7],[.41,.5],[.5,.3]] },
+    { name: "Stella", gloss: "The Lucky Star", close: true,
+      reason: "Because out of everyone in the world, I somehow got you. That's luck I'll never take for granted.",
+      stars: pentagram() },
+    { name: "Infinitas", gloss: "Forever", close: true,
+      reason: "Because one lifetime with you doesn't sound long enough.",
+      stars: lemniscate(12) },
+    { name: "Kounouz", gloss: "The Treasure", close: false,
+      reason: "K, for Kounouz. Your name means treasures, and you are the only one I need.",
+      stars: [[.3,.12],[.3,.5],[.3,.88],[.74,.12,1],[.76,.88,1]] }
+  ],
+  noLines: ["Are you sure?", "Think again…", "Rabie is sad now", "That button is broken", "Wrong answer, kanouzti", "Okay, it's a Yes now"],
+  letter: [
+    "Kounouz, you are the best thing that has ever happened to me.",
+    "Thank you for your laugh, your patience, your smile and the way you make ordinary days feel special.",
+    "Whatever the sky looks like tonight, I'm looking at you. Nhebbek barcha."
+  ]
+};
+function pentagram() {
+  const pts = [];
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + i * (Math.PI * 4 / 5);
+    pts.push([.5 + Math.cos(a) * .42, .54 + Math.sin(a) * .42]);
+  }
+  return pts;
+}
+function lemniscate(n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const t = Math.PI / 2 + ((i + .5) / n) * Math.PI * 2, d = 1 + Math.sin(t) ** 2;
+    pts.push([.5 + .44 * Math.cos(t) / d, .5 + .44 * Math.sin(t) * Math.cos(t) / d * 1.4]);
+  }
+  return pts;
+}
+/* ============================================================ */
+
+const $ = id => document.getElementById(id);
+const canvas = $("sky"), ctx = canvas.getContext("2d");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII"];
+let W = 0, H = 0;
+
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = canvas.clientWidth; H = canvas.clientHeight;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  makeSky();
+}
+addEventListener("resize", resize);
+
+/* ---------- sky ---------- */
+let bg = [], shooting = null, twinkles = [];
+function makeSky() {
+  const n = Math.round(W * H / 2600);
+  bg = Array.from({ length: n }, () => ({
+    x: Math.random() * W, y: Math.random() * H,
+    r: Math.random() < .08 ? 1.4 + Math.random() : .3 + Math.random() * .9,
+    p: Math.random() * 6.28, s: .5 + Math.random() * 1.5,
+    hue: Math.random() < .15 ? "#ffd9a8" : Math.random() < .1 ? "#cbd5ff" : "#efe9ff"
+  }));
+}
+function drawSky(t) {
+  const g = ctx.createRadialGradient(W * .5, H * 1.1, 10, W * .5, H * .6, Math.max(W, H));
+  g.addColorStop(0, "#2a1f4f"); g.addColorStop(.45, "#141236"); g.addColorStop(1, "#0b0a1f");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // milky way band
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(-.5);
+  const mw = ctx.createLinearGradient(0, -H * .18, 0, H * .18);
+  mw.addColorStop(0, "rgba(160,140,255,0)"); mw.addColorStop(.5, "rgba(160,140,255,.07)"); mw.addColorStop(1, "rgba(160,140,255,0)");
+  ctx.fillStyle = mw; ctx.fillRect(-W * 1.5, -H * .18, W * 3, H * .36);
+  ctx.restore();
+  for (const s of bg) {
+    ctx.globalAlpha = .25 + .6 * Math.sin(t * .001 * s.s + s.p) ** 2;
+    ctx.fillStyle = s.hue; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.28); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // shooting star
+  if (!reduceMotion && !shooting && Math.random() < .004) {
+    shooting = { x: Math.random() * W * .8, y: Math.random() * H * .35, vx: 520 + Math.random() * 300, vy: 180 + Math.random() * 120, life: 1 };
+  }
+  if (shooting) {
+    const s = shooting, tail = .09;
+    const lg = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * tail, s.y - s.vy * tail);
+    lg.addColorStop(0, `rgba(255,240,220,${s.life})`); lg.addColorStop(1, "rgba(255,240,220,0)");
+    ctx.strokeStyle = lg; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * tail, s.y - s.vy * tail); ctx.stroke();
+  }
+}
+
+/* ---------- constellation geometry ---------- */
+function box() {
+  const top = Math.max(120, H * .17), bottom = H - Math.max(90, H * .12);
+  const size = Math.max(160, Math.min(W - 48, bottom - top, 540));
+  return { x: (W - size) / 2, y: top + (bottom - top - size) / 2, size };
+}
+function pos(st) { const b = box(); return { x: b.x + st[0] * b.size, y: b.y + st[1] * b.size }; }
+
+/* ---------- state ---------- */
+let state = "intro", level = 0, step = 0, segs = [], doneAt = 0, last = 0, hearts = [];
+const lv = () => CONFIG.constellations[level];
+
+function drawConstellation(t) {
+  const c = lv(), complete = step >= c.stars.length;
+  const glow = complete ? Math.min(1, (t - doneAt) / 900) : 0;
+  // lines
+  ctx.lineCap = "round";
+  for (const sg of segs) {
+    sg.p = Math.min(1, sg.p + (reduceMotion ? 1 : .07));
+    const a = pos(c.stars[sg.a]), b = pos(c.stars[sg.b]);
+    const ex = a.x + (b.x - a.x) * sg.p, ey = a.y + (b.y - a.y) * sg.p;
+    ctx.strokeStyle = `rgba(255,217,168,${.55 + .45 * glow})`;
+    ctx.lineWidth = 1.4 + glow * 1.2;
+    ctx.shadowColor = "rgba(255,190,140,.9)"; ctx.shadowBlur = 6 + glow * 16;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(ex, ey); ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  // stars
+  c.stars.forEach((st, i) => {
+    const p = pos(st), lit = i < step, isNext = i === step && state === "play";
+    const r = lit ? 4.5 + glow * 1.5 : isNext ? 5 : 2.6;
+    if (isNext) {
+      const pulse = reduceMotion ? .5 : (Math.sin(t * .005) + 1) / 2;
+      ctx.strokeStyle = `rgba(255,143,177,${.35 + .4 * pulse})`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 14 + pulse * 8, 0, 6.28); ctx.stroke();
+    }
+    const halo = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 5);
+    halo.addColorStop(0, lit || isNext ? "rgba(255,217,168,.55)" : "rgba(239,233,255,.25)");
+    halo.addColorStop(1, "rgba(255,217,168,0)");
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(p.x, p.y, r * 5, 0, 6.28); ctx.fill();
+    ctx.fillStyle = lit ? "#fff4e4" : isNext ? "#ffe6c8" : "rgba(239,233,255,.6)";
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 6.28); ctx.fill();
+  });
+}
+
+/* sparkles from taps */
+function sparkle(x, y, n, color) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.28, s = 30 + Math.random() * (n > 10 ? 180 : 70);
+    twinkles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, color });
+  }
+}
+function drawTwinkles(dt) {
+  for (const s of twinkles) {
+    s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= .96; s.vy *= .96; s.life -= dt * 1.2;
+    if (s.life > 0) { ctx.globalAlpha = s.life; ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(s.x, s.y, 1.8, 0, 6.28); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  twinkles = twinkles.filter(s => s.life > 0);
+}
+
+/* heart rain for the finale */
+function heartPath(r) {
+  ctx.beginPath(); ctx.moveTo(0, r * .9);
+  ctx.bezierCurveTo(-r * 1.4, -r * .1, -r * .6, -r * 1.1, 0, -r * .4);
+  ctx.bezierCurveTo(r * .6, -r * 1.1, r * 1.4, -r * .1, 0, r * .9); ctx.closePath();
+}
+function drawHearts(dt) {
+  if (state === "love" && hearts.length < 40 && Math.random() < (reduceMotion ? .05 : .25)) {
+    hearts.push({ x: Math.random() * W, y: -20, r: 6 + Math.random() * 10, vy: 40 + Math.random() * 70, sw: Math.random() * 6.28, c: Math.random() < .5 ? "#ff8fb1" : "#ffd9a8" });
+  }
+  for (const h of hearts) {
+    h.y += h.vy * dt; h.sw += dt * 1.5;
+    ctx.save(); ctx.translate(h.x + Math.sin(h.sw) * 14, h.y); ctx.globalAlpha = .75;
+    ctx.fillStyle = h.c; heartPath(h.r); ctx.fill(); ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  hearts = hearts.filter(h => h.y < H + 30);
+}
+
+/* ---------- input ---------- */
+canvas.addEventListener("pointerdown", e => {
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (state !== "play") { sparkle(x, y, 6, "#efe9ff"); return; }
+  const c = lv(), p = pos(c.stars[step]);
+  const reach = Math.max(30, box().size * .075);
+  if (Math.hypot(x - p.x, y - p.y) <= reach) connect();
+  else sparkle(x, y, 5, "#8d87b8");
+});
+addEventListener("keydown", e => {
+  if (state === "play" && (e.key === " " || e.key === "Enter") && document.activeElement === document.body) { e.preventDefault(); connect(); }
+});
+
+function connect() {
+  const c = lv(), st = c.stars[step];
+  const from = st.length > 2 ? st[2] : step - 1;
+  if (from >= 0) segs.push({ a: from, b: step, p: 0 });
+  const p = pos(st);
+  sparkle(p.x, p.y, 8, "#ffd9a8");
+  note(step);
+  step++;
+  if (step >= c.stars.length) {
+    if (c.close) segs.push({ a: c.stars.length - 1, b: 0, p: 0 });
+    complete();
+  }
+}
+
+function complete() {
+  state = "reveal"; doneAt = performance.now();
+  setTimeout(() => arpeggio(), 150);
+  const b = box();
+  for (let i = 0; i < 4; i++) setTimeout(() => sparkle(b.x + b.size * Math.random(), b.y + b.size * Math.random(), 14, i % 2 ? "#ff8fb1" : "#ffd9a8"), 200 + i * 160);
+  $("hint").hidden = true;
+  setTimeout(() => {
+    const n = CONFIG.constellations.length;
+    $("reasonNo").textContent = `Reason ${level + 1} of ${n} · ${lv().name}`;
+    $("reasonText").textContent = lv().reason;
+    $("reasonFrom").textContent = level === n - 1 ? "One more thing…" : "";
+    $("next").textContent = level === n - 1 ? "One last question" : "Next constellation";
+    $("sheet").hidden = false;
+    $("next").focus({ preventScroll: true });
+  }, 1100);
+}
+
+/* ---------- sound ---------- */
+let audio = null, muted = false;
+const SCALE = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5, 1567.98, 1760];
+function tone(f, when, len, vol) {
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = "sine"; o.frequency.value = f;
+  g.gain.setValueAtTime(0, when); g.gain.linearRampToValueAtTime(vol, when + .02);
+  g.gain.exponentialRampToValueAtTime(.0001, when + len);
+  o.connect(g).connect(audio.destination); o.start(when); o.stop(when + len + .05);
+}
+function note(i) { if (audio && !muted) tone(SCALE[i % SCALE.length], audio.currentTime, 1.4, .1); }
+function arpeggio() {
+  if (!audio || muted) return;
+  const n = audio.currentTime;
+  [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => tone(f, n + i * .11, 1.8, .08));
+}
+$("mute").addEventListener("click", () => {
+  muted = !muted;
+  $("mute").textContent = muted ? "×" : "♪";
+  $("mute").setAttribute("aria-label", muted ? "Turn sound on" : "Turn sound off");
+});
+
+/* ---------- flow ---------- */
+function show(id) { for (const s of ["intro", "question", "finale"]) $(s).hidden = s !== id; }
+function setLevel(i) {
+  level = i; step = 0; segs = []; state = "play";
+  const c = lv(), n = CONFIG.constellations.length;
+  $("plateNo").textContent = `Plate ${ROMAN[i]} of ${ROMAN[n - 1]}`;
+  $("plateName").textContent = c.name;
+  $("plateGloss").textContent = c.gloss;
+  $("hintText").textContent = i === 0 ? "Tap the glowing star" : "Follow the glowing star";
+  $("dots").replaceChildren(...CONFIG.constellations.map((_, k) => { const d = document.createElement("i"); if (k < i) d.className = "on"; return d; }));
+  $("sheet").hidden = true; $("head").hidden = false; $("hint").hidden = false;
+}
+function start() {
+  if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  audio?.resume?.();
+  hearts = []; show(null); setLevel(0);
+}
+$("next").addEventListener("click", () => {
+  if (level < CONFIG.constellations.length - 1) setLevel(level + 1);
+  else { state = "ask"; $("sheet").hidden = true; $("head").hidden = true; resetNo(); show("question"); }
+});
+
+/* the No button that doesn't want to be pressed */
+let dodges = 0;
+function resetNo() {
+  dodges = 0; const no = $("no");
+  no.classList.remove("loose"); no.style.left = no.style.top = ""; no.style.transform = "";
+  no.textContent = "No"; $("yes").style.transform = ""; $("noLine").textContent = " ";
+}
+function dodge(e) {
+  const no = $("no");
+  if (dodges >= CONFIG.noLines.length - 1) { no.textContent = "Yes"; return; }
+  e?.preventDefault();
+  $("noLine").textContent = CONFIG.noLines[dodges];
+  dodges++;
+  const r = no.getBoundingClientRect();
+  if (!no.classList.contains("loose")) { no.classList.add("loose"); no.style.left = r.left + "px"; no.style.top = r.top + "px"; }
+  const pad = 16, maxX = innerWidth - r.width - pad, maxY = innerHeight - r.height - pad;
+  requestAnimationFrame(() => {
+    no.style.left = (pad + Math.random() * Math.max(0, maxX - pad)) + "px";
+    no.style.top = (pad + Math.random() * Math.max(0, maxY - pad)) + "px";
+    no.style.transform = `scale(${Math.max(.6, 1 - dodges * .08)})`;
+  });
+  $("yes").style.transform = `scale(${1 + dodges * .12})`;
+  if (dodges >= CONFIG.noLines.length - 1) no.textContent = "Yes";
+}
+$("no").addEventListener("pointerenter", e => { if (e.pointerType === "mouse") dodge(e); });
+$("no").addEventListener("pointerdown", dodge);
+$("no").addEventListener("click", e => { if ($("no").textContent === "Yes") yes(); else dodge(e); });
+$("yes").addEventListener("click", yes);
+function yes() {
+  resetNo(); state = "love"; arpeggio(); setTimeout(arpeggio, 500);
+  for (let i = 0; i < 8; i++) setTimeout(() => sparkle(Math.random() * W, H * (.15 + Math.random() * .5), 18, i % 2 ? "#ff8fb1" : "#ffd9a8"), i * 140);
+  show("finale");
+}
+$("again").addEventListener("click", start);
+$("start").addEventListener("click", start);
+
+/* ---------- wire up ---------- */
+for (const id of ["nameIntro", "nameAsk"]) $(id).textContent = CONFIG.name;
+$("photo").src = CONFIG.photo;
+$("letter").replaceChildren(...CONFIG.letter.map(t => { const p = document.createElement("p"); p.textContent = t; return p; }));
+$("sign").textContent = CONFIG.from;
+
+function loop(t) {
+  const dt = Math.min(.05, (t - (last || t)) / 1000); last = t;
+  drawSky(t);
+  if (shooting) { shooting.x += shooting.vx * dt; shooting.y += shooting.vy * dt; shooting.life -= dt * 1.3; if (shooting.life <= 0) shooting = null; }
+  if (state === "play" || state === "reveal") drawConstellation(t);
+  drawHearts(dt);
+  drawTwinkles(dt);
+  requestAnimationFrame(loop);
+}
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
