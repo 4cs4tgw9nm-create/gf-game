@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rabie Translator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&family=Amiri:wght@700&display=swap">
+<style>
+/* Layout: a tiny phone app. A header with the mascot, one screen at a time in the middle,
+   and a tab bar at the bottom: Translate, Overthinking, Love meter, Rules. */
+:root {
+  --bg: #fff4f7;
+  --lilac: #ece4ff;
+  --pink: #ff5c8a;
+  --blush: #ffd3df;
+  --ink: #45283a;
+  --soft: #9c7f90;
+  --white: #ffffff;
+  --mint: #bfeccf;
+  --round: "Fredoka", "Baloo 2", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--body); font-size: 16px; line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+#app { position: fixed; inset: 0; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; }
+
+header {
+  display: flex; align-items: center; gap: 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 10px;
+}
+.mascot { width: 46px; height: 42px; flex: none; }
+.mascot svg { width: 100%; height: 100%; display: block; }
+header h1 { margin: 0; font: 700 22px/1.1 var(--round); }
+header p { margin: 0; font: 700 12px var(--body); color: var(--soft); letter-spacing: .06em; text-transform: uppercase; }
+
+.screens { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 20px; }
+.screen { display: flex; flex-direction: column; gap: 14px; animation: in .35s ease both; }
+@keyframes in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.lead { font: 600 18px/1.35 var(--round); margin: 4px 0 0; text-wrap: balance; }
+.note { font-weight: 700; font-size: 14px; color: var(--soft); margin: 0; }
+
+/* translator */
+.count { align-self: flex-start; font: 700 13px var(--body); background: var(--lilac); border-radius: 99px; padding: 4px 12px; font-variant-numeric: tabular-nums; }
+.phrases { display: grid; gap: 12px; }
+.phrase { display: grid; gap: 8px; }
+.said {
+  justify-self: start; max-width: 85%;
+  background: var(--white); border: 0; border-radius: 20px 20px 20px 6px;
+  padding: 12px 16px; text-align: left; cursor: pointer;
+  font: 600 17px var(--round); color: var(--ink);
+  box-shadow: 0 4px 0 var(--lilac), 0 8px 18px rgba(69, 40, 58, .06);
+  display: flex; align-items: center; gap: 10px;
+}
+.said em { font-style: italic; color: var(--soft); font-weight: 500; }
+.said .tap { font: 800 11px var(--body); color: var(--pink); text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; }
+.phrase.open .said .tap { color: var(--soft); }
+.meant {
+  justify-self: end; max-width: 88%;
+  background: var(--pink); color: var(--white);
+  border-radius: 20px 20px 6px 20px; padding: 12px 16px;
+  font: 600 16px/1.35 var(--round);
+  animation: pop .4s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.meant small { display: block; font: 800 10px var(--body); letter-spacing: .12em; text-transform: uppercase; opacity: .8; margin-bottom: 2px; }
+.dots { justify-self: end; background: var(--blush); border-radius: 20px; padding: 12px 16px; display: flex; gap: 5px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--pink); animation: bounce 1s infinite; }
+.dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce { 0%, 60%, 100% { transform: none; opacity: .5; } 30% { transform: translateY(-5px); opacity: 1; } }
+@keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* overthinking machine */
+.machine {
+  position: relative; align-self: center; width: min(70vw, 230px); max-width: 100%; aspect-ratio: 1;
+  display: grid; place-items: center;
+}
+.machine svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.machine.shake svg { animation: shake .12s linear 8; }
+@keyframes shake { 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  border: 2px solid var(--blush); background: var(--white); color: var(--ink);
+  border-radius: 99px; padding: 8px 14px; cursor: pointer;
+  font: 700 14px var(--body);
+}
+.chip.used { opacity: .45; }
+.own { display: flex; gap: 8px; }
+.own input {
+  flex: 1; min-width: 0; border: 2px solid var(--blush); border-radius: 99px;
+  padding: 10px 14px; font: 700 15px var(--body); color: var(--ink); background: var(--white);
+}
+.own input::placeholder { color: var(--soft); }
+.answer {
+  background: var(--white); border-radius: 22px; padding: 16px 18px;
+  box-shadow: 0 6px 0 var(--mint), 0 10px 22px rgba(69, 40, 58, .06);
+  display: grid; gap: 6px; animation: pop .45s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.answer .q { font: 700 13px var(--body); color: var(--soft); }
+.answer .a { font: 600 19px/1.3 var(--round); }
+
+/* love meter */
+.gauge { align-self: center; width: min(78vw, 300px); max-width: 100%; }
+.gauge svg { width: 100%; display: block; }
+.slider-wrap { display: grid; gap: 6px; }
+input[type=range] { width: 100%; accent-color: var(--pink); height: 32px; }
+.meter-msg { min-height: 48px; text-align: center; font: 600 17px/1.3 var(--round); }
+
+/* rules + finale */
+.rules { display: grid; gap: 10px; counter-reset: r; }
+.rule {
+  background: var(--white); border-radius: 18px; padding: 14px 16px 14px 56px; position: relative;
+  font: 600 16px/1.35 var(--round); box-shadow: 0 4px 0 var(--lilac);
+}
+.rule::before {
+  counter-increment: r; content: counter(r);
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  width: 30px; height: 30px; border-radius: 50%; background: var(--pink); color: #fff;
+  display: grid; place-items: center; font: 700 15px var(--round);
+}
+.polaroid { align-self: center; width: min(52%, 190px); margin: 6px 0 0; padding: 9px 9px 32px; background: #fff; transform: rotate(2.5deg); box-shadow: 0 14px 30px rgba(69, 40, 58, .18); position: relative; }
+.polaroid img { display: block; width: 100%; max-width: 100%; aspect-ratio: 4 / 5; object-fit: cover; }
+.polaroid figcaption { position: absolute; left: 0; right: 0; bottom: 7px; text-align: center; font: 600 14px var(--round); }
+.arabic { text-align: center; font-family: "Amiri", "Noto Naskh Arabic", "Geeza Pro", serif; font-size: 26px; color: var(--pink); direction: rtl; }
+.sign { text-align: center; font: 700 20px var(--round); color: var(--pink); }
+
+.btn {
+  align-self: center; border: 0; border-radius: 99px; cursor: pointer;
+  padding: 13px 26px; background: var(--pink); color: #fff;
+  font: 700 17px var(--round); box-shadow: 0 5px 0 #d63d6c;
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #d63d6c; }
+.btn.small { padding: 10px 18px; font-size: 15px; }
+
+/* intro */
+.intro { position: fixed; inset: 0; z-index: 5; background: var(--bg); display: grid; place-items: center; padding: 24px 16px; overflow-y: auto; }
+.intro .card { max-width: 400px; width: 100%; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.intro .big { width: 140px; height: 128px; }
+.intro .big svg { width: 100%; height: 100%; animation: float 3s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-8px); } }
+.intro h2 { margin: 0; font: 700 clamp(30px, 9vw, 40px)/1.05 var(--round); text-wrap: balance; }
+.intro h2 em { font-style: normal; color: var(--pink); }
+.intro p { margin: 0; font-weight: 700; }
+.version { font: 800 11px var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--soft); background: var(--lilac); padding: 4px 12px; border-radius: 99px; }
+
+/* tabs */
+nav {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--white); border-radius: 24px 24px 0 0;
+  padding: 8px 6px calc(env(safe-area-inset-bottom, 0px) + 8px);
+  box-shadow: 0 -6px 20px rgba(69, 40, 58, .06);
+}
+nav button {
+  border: 0; background: none; cursor: pointer; color: var(--soft);
+  display: grid; justify-items: center; gap: 2px; padding: 6px 2px;
+  font: 700 11px var(--body); border-radius: 14px;
+}
+nav button b { font: 600 20px/1 var(--round); }
+nav button[aria-selected="true"] { color: var(--pink); background: #fff0f4; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+#confetti { position: fixed; inset: 0; pointer-events: none; z-index: 9; }
+#confetti span { position: absolute; top: -20px; color: var(--pink); animation: fall linear forwards; }
+@keyframes fall { to { transform: translateY(110vh) rotate(200deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01s !important; animation-iteration-count: 1 !important; }
+}
+</style>
+</head>
+<body>
+<div id="confetti" aria-hidden="true"></div>
+
+<div class="intro" id="intro">
+  <div class="card">
+    <div class="big" id="bigMascot"></div>
+    <span class="version">Version 1.0 · for Kounouz only</span>
+    <h2>The <em>Rabie</em> Translator</h2>
+    <p>Rabie loves you a lot, but he's not always good at saying it. Sometimes he says "ok" and your brain writes a whole movie.</p>
+    <p>This little app translates what he says into what he means.</p>
+    <button class="btn" id="open" type="button">Open the translator ♥</button>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="mascot" id="mascot"></div>
+    <div><h1>Rabie Translator</h1><p id="sub">Rabie → Kounouz</p></div>
+  </header>
+
+  <div class="screens">
+    <!-- translate -->
+    <section class="screen" id="tab-translate">
+      <p class="lead">Tap something Rabie says. The translator will tell you what he really means.</p>
+      <span class="count" id="count">0 / 0 translated</span>
+      <div class="phrases" id="phrases"></div>
+    </section>
+
+    <!-- overthinking -->
+    <section class="screen" id="tab-worry" hidden>
+      <p class="lead">The Overthinking Machine. Put a worry in, and the truth comes out.</p>
+      <div class="machine" id="machine"></div>
+      <div class="chips" id="chips"></div>
+      <form class="own" id="ownForm">
+        <input id="ownWorry" type="text" maxlength="90" placeholder="Or type your own worry…" autocomplete="off" aria-label="Type your own worry">
+        <button class="btn small" type="submit">Put it in</button>
+      </form>
+      <div id="answers" style="display:grid;gap:10px"></div>
+    </section>
+
+    <!-- love meter -->
+    <section class="screen" id="tab-meter" hidden>
+      <p class="lead">How much does Rabie love Kounouz today? Try to lower it.</p>
+      <div class="gauge"><svg viewBox="0 0 240 165" aria-hidden="true">
+        <path d="M20 125 A100 100 0 0 1 220 125" fill="none" stroke="#ece4ff" stroke-width="22" stroke-linecap="round"/>
+        <path id="arc" d="M20 125 A100 100 0 0 1 220 125" fill="none" stroke="#ff5c8a" stroke-width="22" stroke-linecap="round" pathLength="100" stroke-dasharray="100 100"/>
+        <g id="needle" transform="rotate(90 120 125)"><line x1="120" y1="125" x2="120" y2="45" stroke="#45283a" stroke-width="6" stroke-linecap="round"/></g>
+        <circle cx="120" cy="125" r="11" fill="#45283a"/>
+        <text id="pct" x="120" y="162" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="30" fill="#45283a">100%</text>
+      </svg></div>
+      <div class="slider-wrap">
+        <input type="range" id="love" min="0" max="100" value="100" aria-label="Rabie's love level">
+      </div>
+      <div class="meter-msg" id="meterMsg">Fully charged. As always.</div>
+    </section>
+
+    <!-- rules -->
+    <section class="screen" id="tab-rules" hidden>
+      <p class="lead">The official rules of Rabie. Read these whenever you start overthinking.</p>
+      <div class="rules" id="rules"></div>
+      <figure class="polaroid"><img id="photo" alt="Kounouz smiling"><figcaption>the one I love</figcaption></figure>
+      <div class="arabic">نحبك برشا يا كنوزتي</div>
+      <div class="sign" id="sign"></div>
+      <button class="btn" id="hug" type="button">Claim a real hug from Rabie</button>
+    </section>
+  </div>
+
+  <nav role="tablist" aria-label="Sections">
+    <button role="tab" data-tab="translate" aria-selected="true" type="button"><b>💬</b>Translate</button>
+    <button role="tab" data-tab="worry" aria-selected="false" type="button"><b>🌀</b>Overthinking</button>
+    <button role="tab" data-tab="meter" aria-selected="false" type="button"><b>♥</b>Love meter</button>
+    <button role="tab" data-tab="rules" aria-selected="false" type="button"><b>📜</b>Rules</button>
+  </nav>
+</div>
+
+<script>
+/* ============================================================
+   EDIT HERE: everything she reads
+   ============================================================ */
+const FROM = "Rabie", PHOTO = "assets/kounouz.jpg";
+const PHRASES = [
+  { said: "ok", meant: "I love you. I'm just bad at writing long messages." },
+  { said: "hmm", meant: "I'm thinking about you. Maybe also about food. Mostly you." },
+  { said: "I'm tired", meant: "Tired from the day. Never tired of you. Not even a little." },
+  { said: "nothing", meant: "Something small is bothering me, and it's NOT you. I just need a minute, then a hug." },
+  { said: "I'm fine", meant: "I'm fine, and I'm better when you're next to me." },
+  { said: "*seen, no reply*", em: true, meant: "I read it, smiled, and got distracted thinking about you. Sorry, I'll reply faster." },
+  { said: "*quiet all day*", em: true, meant: "My head was busy. My heart was 100% yours the whole time." },
+  { said: "goodnight", meant: "Goodnight, my whole world. I'm falling asleep thinking about you." }
+];
+const WORRIES = [
+  { q: "Is he mad at me?", a: "No. And if he ever is, he'll tell you with words, not silence. That's his promise." },
+  { q: "Does he still love me like before?", a: "No. He loves you more than before. It keeps growing, that's the problem." },
+  { q: "Did I do something wrong?", a: "You didn't. Sometimes he's just quiet. Quiet Rabie still loves you." },
+  { q: "Is he bored of me?", a: "Impossible. You're his favorite person to do nothing with." },
+  { q: "Why was his reply so short?", a: "Because his thumbs are lazy, not his heart." },
+  { q: "What if he changes?", a: "The only thing that changes is how much he loves you. Upwards." }
+];
+const OWN_ANSWERS = [
+  "Whatever this thought is, the answer is the same: he loves you. Ask him, he'll say it out loud.",
+  "The machine checked. Rabie still loves you. Very much. Results are final.",
+  "This worry has been reviewed and rejected. Reason: he adores you."
+];
+const METER = [
+  [100, "Fully charged. As always."],
+  [80, "Nice try. It's going back up."],
+  [50, "Error: love cannot go below 100%."],
+  [20, "The machine is refusing. Rabie says no."],
+  [0, "Nope. Not possible. Not even in your overthinking."]
+];
+const RULES = [
+  "When I'm quiet, I still love you. Quiet is not angry.",
+  "If something is wrong, I'll tell you. You never have to guess.",
+  "A short message is a lazy thumb, not a lazy heart.",
+  "When you start overthinking, just ask me. I'll always answer.",
+  "The answer is always the same: I love you, Kounouz."
+];
+/* ============================================================ */
+
+const $ = id => document.getElementById(id);
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- mascot ---------- */
+const heart = (mood = "happy") => `<svg viewBox="0 0 200 185" aria-hidden="true">
+  <path d="M100 172 C40 128 8 98 8 60 C8 30 33 9 60 9 C79 9 93 20 100 36 C107 20 121 9 140 9 C167 9 192 30 192 60 C192 98 160 128 100 172Z" fill="#ff8fae"/>
+  <ellipse cx="72" cy="40" rx="16" ry="9" fill="#fff" opacity=".4" transform="rotate(-25 72 40)"/>
+  ${mood === "love"
+    ? `<path d="M74 70 c-6 -8 -18 -2 -12 8 l12 12 l12 -12 c6 -10 -6 -16 -12 -8z" fill="#d6245a"/><path d="M126 70 c-6 -8 -18 -2 -12 8 l12 12 l12 -12 c6 -10 -6 -16 -12 -8z" fill="#d6245a"/>`
+    : `<ellipse cx="74" cy="78" rx="9" ry="11" fill="#45283a"/><ellipse cx="126" cy="78" rx="9" ry="11" fill="#45283a"/><circle cx="77" cy="74" r="3.5" fill="#fff"/><circle cx="129" cy="74" r="3.5" fill="#fff"/>`}
+  <ellipse cx="58" cy="100" rx="12" ry="7" fill="#ff5c8a" opacity=".7"/><ellipse cx="142" cy="100" rx="12" ry="7" fill="#ff5c8a" opacity=".7"/>
+  <path d="M86 100 Q100 116 114 100" stroke="#45283a" stroke-width="5" fill="none" stroke-linecap="round"/>
+</svg>`;
+$("mascot").innerHTML = heart();
+$("bigMascot").innerHTML = heart("love");
+function mascotLove() { $("mascot").innerHTML = heart("love"); clearTimeout(mascotLove.t); mascotLove.t = setTimeout(() => $("mascot").innerHTML = heart(), 1600); }
+
+/* ---------- sound + confetti ---------- */
+let audio = null;
+function chime(fs, vol = .07) {
+  try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume?.(); } catch (e) { return; }
+  const t = audio.currentTime;
+  fs.forEach((f, i) => {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = "sine"; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t + i * .08); g.gain.linearRampToValueAtTime(vol, t + i * .08 + .02);
+    g.gain.exponentialRampToValueAtTime(.0001, t + i * .08 + .5);
+    o.connect(g).connect(audio.destination); o.start(t + i * .08); o.stop(t + i * .08 + .55);
+  });
+}
+function confetti(n = 18) {
+  if (reduceMotion) return;
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement("span");
+    s.textContent = ["♥", "✦", "♥"][i % 3];
+    s.style.left = Math.random() * 100 + "vw";
+    s.style.fontSize = 12 + Math.random() * 18 + "px";
+    s.style.color = ["#ff5c8a", "#ffb3c6", "#b79cf2"][i % 3];
+    s.style.animationDuration = 2 + Math.random() * 2 + "s";
+    s.style.animationDelay = Math.random() * .4 + "s";
+    $("confetti").appendChild(s);
+    setTimeout(() => s.remove(), 5000);
+  }
+}
+
+/* ---------- tabs ---------- */
+const TABS = ["translate", "worry", "meter", "rules"];
+for (const b of document.querySelectorAll("nav button")) b.addEventListener("click", () => openTab(b.dataset.tab));
+function openTab(name) {
+  for (const t of TABS) $("tab-" + t).hidden = t !== name;
+  for (const b of document.querySelectorAll("nav button")) b.setAttribute("aria-selected", b.dataset.tab === name);
+  chime([700]);
+  document.querySelector(".screens").scrollTop = 0;
+}
+$("open").addEventListener("click", () => { $("intro").hidden = true; chime([523, 659, 784]); confetti(14); });
+
+/* ---------- translator ---------- */
+let translated = 0;
+function updateCount() { $("count").textContent = `${translated} / ${PHRASES.length} translated`; }
+$("phrases").replaceChildren(...PHRASES.map(p => {
+  const wrap = document.createElement("div"); wrap.className = "phrase";
+  const said = document.createElement("button"); said.type = "button"; said.className = "said";
+  const text = document.createElement(p.em ? "em" : "span"); text.textContent = p.said;
+  const tap = document.createElement("span"); tap.className = "tap"; tap.textContent = "translate ▸";
+  said.append(text, tap);
+  said.addEventListener("click", () => {
+    if (wrap.classList.contains("open")) return;
+    wrap.classList.add("open"); tap.textContent = "translated ✓";
+    const dots = document.createElement("div"); dots.className = "dots"; dots.innerHTML = "<i></i><i></i><i></i>";
+    wrap.append(dots); chime([600, 800], .04);
+    setTimeout(() => {
+      dots.remove();
+      const m = document.createElement("div"); m.className = "meant";
+      m.innerHTML = "<small>What Rabie means</small>";
+      m.append(document.createTextNode(p.meant));
+      wrap.append(m);
+      translated++; updateCount(); mascotLove(); chime([784, 1047]);
+      if (translated === PHRASES.length) setTimeout(() => { confetti(30); chime([523, 659, 784, 1047, 1319]); $("count").textContent = "All translated. Conclusion: he loves you ♥"; }, 400);
+    }, reduceMotion ? 50 : 900);
+  });
+  wrap.append(said);
+  return wrap;
+}));
+updateCount();
+
+/* ---------- overthinking machine ---------- */
+$("machine").innerHTML = `<svg viewBox="0 0 200 200" aria-hidden="true">
+  <rect x="40" y="70" width="120" height="110" rx="24" fill="#ece4ff"/>
+  <rect x="58" y="92" width="84" height="54" rx="14" fill="#fff"/>
+  <path id="swirl" d="M100 119 m-18 0 a18 18 0 1 0 36 0 a12 12 0 1 0 -24 0 a6 6 0 1 0 12 0" fill="none" stroke="#ff5c8a" stroke-width="5" stroke-linecap="round"/>
+  <path d="M80 70 L72 34 L128 34 L120 70Z" fill="#ffd3df"/>
+  <rect x="66" y="26" width="68" height="12" rx="6" fill="#ff8fae"/>
+  <rect x="88" y="180" width="24" height="10" rx="4" fill="#cdbff5"/>
+  <circle cx="60" cy="162" r="6" fill="#ff5c8a"/><circle cx="78" cy="162" r="6" fill="#bfeccf"/>
+</svg>`;
+function runMachine(q, a, chip) {
+  const m = $("machine");
+  m.classList.remove("shake"); void m.offsetWidth; m.classList.add("shake");
+  chime([300, 360, 300], .05);
+  setTimeout(() => {
+    m.classList.remove("shake");
+    const card = document.createElement("div"); card.className = "answer";
+    const qq = document.createElement("div"); qq.className = "q"; qq.textContent = "Worry: " + q;
+    const aa = document.createElement("div"); aa.className = "a"; aa.textContent = a;
+    card.append(qq, aa);
+    $("answers").prepend(card);
+    card.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+    chip?.classList.add("used");
+    chime([659, 880, 1047]); mascotLove(); confetti(8);
+  }, reduceMotion ? 50 : 1000);
+}
+$("chips").replaceChildren(...WORRIES.map(w => {
+  const c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.textContent = w.q;
+  c.addEventListener("click", () => runMachine(w.q, w.a, c));
+  return c;
+}));
+let ownI = 0;
+$("ownForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const v = $("ownWorry").value.trim(); if (!v) return;
+  runMachine(v, OWN_ANSWERS[ownI++ % OWN_ANSWERS.length]);
+  $("ownWorry").value = "";
+});
+
+/* ---------- love meter ---------- */
+const slider = $("love");
+let springTimer = null;
+function drawMeter(v) {
+  $("arc").setAttribute("stroke-dasharray", `${v} 100`);
+  $("needle").setAttribute("transform", `rotate(${-90 + v * 1.8} 120 125)`);
+  $("pct").textContent = Math.round(v) + "%";
+}
+slider.addEventListener("input", () => {
+  const v = +slider.value; drawMeter(v);
+  const msg = METER.find(([at]) => v >= at) || METER[METER.length - 1];
+  $("meterMsg").textContent = msg[1];
+  clearTimeout(springTimer);
+  springTimer = setTimeout(springBack, 450);
+});
+slider.addEventListener("change", () => { clearTimeout(springTimer); springBack(); });
+function springBack() {
+  let v = +slider.value; if (v >= 100) return;
+  const step = () => {
+    v = Math.min(100, v + 4); slider.value = v; drawMeter(v);
+    if (v < 100) requestAnimationFrame(step);
+    else { $("meterMsg").textContent = "Back to 100%. It always comes back."; chime([784, 1047, 1319]); mascotLove(); confetti(10); }
+  };
+  requestAnimationFrame(step);
+}
+drawMeter(100);
+
+/* ---------- rules ---------- */
+$("rules").replaceChildren(...RULES.map(r => { const d = document.createElement("div"); d.className = "rule"; d.textContent = r; return d; }));
+$("photo").src = PHOTO;
+$("sign").textContent = "♥ " + FROM;
+$("hug").addEventListener("click", () => {
+  confetti(36); chime([523, 659, 784, 1047, 1319]); mascotLove();
+  $("hug").textContent = "Hug claimed. Rabie owes you one ♥";
+});
+</script>
+</body>
+</html>
