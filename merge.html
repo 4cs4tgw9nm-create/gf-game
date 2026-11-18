@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kounouz's Sweet Merge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@700;800&display=swap">
+<style>
+/* Layout: a pastel dessert jar fills the phone. Score strip on top, the jar in the middle,
+   the treat ladder underneath so she always knows what merges into what. */
+:root {
+  --bg: #fff3ec;
+  --jar: #fffaf6;
+  --rim: #f3d6c8;
+  --ink: #4b2a36;
+  --soft: #a58593;
+  --pink: #ff5c8a;
+  --round: "Fredoka", "Baloo 2", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body);
+  overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+}
+[hidden] { display: none !important; }
+#app {
+  position: fixed; inset: 0; max-width: 480px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px calc(env(safe-area-inset-bottom, 0px) + 10px);
+}
+.top { display: flex; align-items: center; gap: 10px; }
+.stat { background: #fff; border-radius: 16px; padding: 6px 14px; box-shadow: 0 3px 0 var(--rim); }
+.stat small { display: block; font: 800 10px var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--soft); }
+.stat b { font: 700 22px/1.1 var(--round); font-variant-numeric: tabular-nums; }
+.stat.next { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.stat.next canvas { width: 34px; height: 34px; }
+.icon-btn { width: 42px; height: 42px; border: 0; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 var(--rim); font: 700 17px var(--round); color: var(--ink); cursor: pointer; }
+.wrap { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
+canvas#jar { display: block; touch-action: none; border-radius: 26px; box-shadow: 0 6px 0 var(--rim), 0 20px 40px rgba(75, 42, 54, .1); background: var(--jar); }
+.ladder { display: flex; justify-content: center; align-items: center; gap: 2px; flex-wrap: wrap; }
+.ladder canvas { width: 30px; height: 30px; }
+.ladder span { color: var(--soft); font: 700 11px var(--body); }
+
+.toast {
+  position: absolute; left: 50%; top: 14%; transform: translateX(-50%);
+  width: max-content; max-width: 86%;
+  background: #fff; border-radius: 20px; padding: 10px 16px; text-align: center;
+  box-shadow: 0 8px 24px rgba(75, 42, 54, .15);
+  font: 600 16px/1.3 var(--round); pointer-events: none;
+  animation: toast 2.8s ease forwards;
+}
+.toast small { display: block; font: 800 10px var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--pink); }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.9); } 10%, 85% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; } }
+.combo { position: absolute; font: 700 18px var(--round); color: var(--pink); pointer-events: none; animation: rise 1s ease-out forwards; text-shadow: 0 2px 0 #fff; }
+@keyframes rise { to { transform: translateY(-40px); opacity: 0; } }
+
+.overlay {
+  position: fixed; inset: 0; z-index: 5; display: grid; place-items: center;
+  padding: 24px 16px; background: rgba(255, 243, 236, .9); overflow-y: auto;
+  animation: fade .4s ease both;
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.card { width: 100%; max-width: 380px; background: #fff; border-radius: 28px; padding: 26px 22px; text-align: center; box-shadow: 0 8px 0 var(--rim); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.card h1, .card h2 { margin: 0; font-family: var(--round); font-weight: 700; line-height: 1.05; text-wrap: balance; }
+.card h1 { font-size: clamp(32px, 9vw, 42px); }
+.card h2 { font-size: 30px; }
+.card h1 em, .card h2 em { font-style: normal; color: var(--pink); }
+.card p { margin: 0; font-weight: 700; line-height: 1.45; }
+.card .muted { color: var(--soft); font-size: 14px; }
+.big-score { font: 700 52px/1 var(--round); color: var(--pink); font-variant-numeric: tabular-nums; }
+.btn { border: 0; border-radius: 99px; padding: 14px 30px; cursor: pointer; background: var(--pink); color: #fff; font: 700 18px var(--round); box-shadow: 0 5px 0 #d63d6c; }
+.btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #d63d6c; }
+.btn:focus-visible, .icon-btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+.intro-ladder { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+.intro-ladder div { display: flex; flex-direction: column; align-items: center; gap: 2px; font: 700 12px var(--body); color: var(--soft); }
+.intro-ladder canvas { width: 46px; height: 46px; }
+@media (prefers-reduced-motion: reduce) { .toast, .combo, .overlay { animation-duration: .01s; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="stat"><small>Score</small><b id="score">0</b></div>
+    <div class="stat"><small>Best</small><b id="best">0</b></div>
+    <div class="stat next"><small>Next</small><canvas id="nextC" width="68" height="68"></canvas></div>
+    <button class="icon-btn" id="mute" type="button" aria-label="Turn sound off">♪</button>
+  </div>
+  <div class="wrap" id="wrap">
+    <canvas id="jar" aria-label="Dessert jar. Tap or drag to aim, release to drop a treat."></canvas>
+    <div id="fx"></div>
+  </div>
+  <div class="ladder" id="ladder"></div>
+</div>
+
+<section class="overlay" id="intro">
+  <div class="card">
+    <h1><em>Kounouz</em>'s Sweet Merge</h1>
+    <p>Drop treats into the jar. When two of the same treat touch, they merge into the next one.</p>
+    <div class="intro-ladder" id="introLadder"></div>
+    <p class="muted">Keep merging up to the last one. Don't let the jar overflow above the dotted line.</p>
+    <button class="btn" id="start" type="button">Let's play ♥</button>
+  </div>
+</section>
+
+<section class="overlay" id="over" hidden>
+  <div class="card">
+    <h2>Jar's full!</h2>
+    <div class="big-score" id="finalScore">0</div>
+    <p id="overMsg"></p>
+    <p class="muted" id="overBest"></p>
+    <button class="btn" id="again" type="button">Play again</button>
+  </div>
+</section>
+
+<script>
+/* ============================================================
+   EDIT HERE: the treats and the little messages
+   ============================================================ */
+const TREATS = [
+  { name: "Framboise", r: 15, c: "#ff4f7b", d: "#d92e5a", detail: "seeds" },
+  { name: "Macaron",   r: 20, c: "#c4adf5", d: "#9c84d6", detail: "stripe" },
+  { name: "Matcha",    r: 26, c: "#9fd67c", d: "#6fae4c", detail: "leaf" },
+  { name: "Donut",     r: 33, c: "#ffb877", d: "#e08f45", detail: "sprinkles" },
+  { name: "Cupcake",   r: 40, c: "#ff9cc0", d: "#e2709a", detail: "cherry" },
+  { name: "Pizza",     r: 48, c: "#ffd45e", d: "#e3a93a", detail: "pepperoni" },
+  { name: "Tiramisu",  r: 57, c: "#d3a27a", d: "#a87650", detail: "cocoa" },
+  { name: "Big Cake",  r: 67, c: "#ffd9e6", d: "#f0a9c2", detail: "candles" },
+  { name: "Rabie's Heart", r: 79, c: "#ff3d73", d: "#cc2353", detail: "heart" }
+];
+const UNLOCK_LINES = [
+  null, null, null,
+  "A donut! Sweet, but not as sweet as you.",
+  "Cupcake unlocked. You're cuter though.",
+  "Pizza! Rabie owes you a real one.",
+  "Tiramisu! You're on fire, kanouzti.",
+  "BIG CAKE. Okay, you're officially a pro.",
+  "You made Rabie's heart. It was always yours anyway ♥"
+];
+const CHEERS = ["Yummy!", "Nice!", "Combo!", "So good!", "Bravo!", "Hlowa!"];
+const OVER_LINES = [
+  "Rabie is proud of you. One more?",
+  "Not bad at all, kanouzti!",
+  "You're getting better every time.",
+  "That jar never stood a chance."
+];
+/* ============================================================ */
+
+const $ = id => document.getElementById(id);
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const W = 360, H = 560, LINE = 96, WALL = 10;
+const canvas = $("jar"), ctx = canvas.getContext("2d");
+let scale = 1, dpr = 1;
+
+/* ---------- drawing a kawaii treat ---------- */
+function drawTreat(c, t, x, y, r, face = true, squish = 0) {
+  const T = TREATS[t];
+  c.save(); c.translate(x, y); c.scale(1 + squish, 1 - squish);
+  c.fillStyle = T.d; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill();
+  c.fillStyle = T.c; c.beginPath(); c.arc(0, -r * .06, r * .92, 0, Math.PI * 2); c.fill();
+  const k = r / 40;
+  c.fillStyle = "rgba(255,255,255,.45)";
+  c.beginPath(); c.ellipse(-r * .38, -r * .45, r * .22, r * .12, -.6, 0, Math.PI * 2); c.fill();
+  // details
+  if (T.detail === "seeds") { c.fillStyle = "#ffd1dc"; for (const [a, b] of [[-.4, .1], [.35, -.15], [.1, .45], [-.1, -.5], [.5, .35], [-.5, .5]]) { c.beginPath(); c.ellipse(a * r, b * r, 1.6 * k + .6, 2.4 * k + .8, 0, 0, Math.PI * 2); c.fill(); } }
+  if (T.detail === "stripe") { c.fillStyle = "#fff4fb"; c.fillRect(-r * .9, r * .18, r * 1.8, r * .22); }
+  if (T.detail === "leaf") { c.fillStyle = "#4f8f35"; c.beginPath(); c.ellipse(r * .35, -r * .72, r * .28, r * .13, -.5, 0, Math.PI * 2); c.fill(); }
+  if (T.detail === "sprinkles") { const cols = ["#fff", "#7fd4c8", "#b79cf2", "#ff5c8a"]; [[-.55, -.3, .5], [.5, -.4, -.4], [-.2, .55, 1], [.55, .35, .2], [0, -.65, 1.3]].forEach(([a, b, rot], i) => { c.save(); c.translate(a * r, b * r); c.rotate(rot); c.fillStyle = cols[i % 4]; c.fillRect(-4 * k, -1.3 * k, 8 * k, 2.6 * k); c.restore(); }); }
+  if (T.detail === "cherry") { c.fillStyle = "#d7263d"; c.beginPath(); c.arc(0, -r * .82, r * .17, 0, Math.PI * 2); c.fill(); }
+  if (T.detail === "pepperoni") { c.fillStyle = "#e0413b"; for (const [a, b] of [[-.5, -.2], [.45, -.35], [.5, .4], [-.4, .5]]) { c.beginPath(); c.arc(a * r, b * r, r * .13, 0, Math.PI * 2); c.fill(); } }
+  if (T.detail === "cocoa") { c.fillStyle = "rgba(90,50,30,.35)"; for (let i = 0; i < 9; i++) { c.beginPath(); c.arc(Math.cos(i * 2.4) * r * .65, Math.sin(i * 2.4) * r * .6, r * .05, 0, Math.PI * 2); c.fill(); } }
+  if (T.detail === "candles") { [-.3, 0, .3].forEach(a => { c.fillStyle = "#b79cf2"; c.fillRect(a * r - 3 * k, -r * 1.05, 6 * k, r * .3); c.fillStyle = "#ffcf3a"; c.beginPath(); c.ellipse(a * r, -r * 1.12, 3 * k, 5 * k, 0, 0, Math.PI * 2); c.fill(); }); }
+  if (T.detail === "heart") { c.fillStyle = "rgba(255,255,255,.25)"; c.beginPath(); c.moveTo(0, r * .55); c.bezierCurveTo(-r * .9, -r * .05, -r * .4, -r * .75, 0, -r * .3); c.bezierCurveTo(r * .4, -r * .75, r * .9, -r * .05, 0, r * .55); c.fill(); }
+  // face
+  if (face) {
+    const e = Math.max(1.6, r * .09);
+    c.fillStyle = "#4b2a36";
+    c.beginPath(); c.arc(-r * .3, r * .02, e, 0, Math.PI * 2); c.arc(r * .3, r * .02, e, 0, Math.PI * 2); c.fill();
+    c.fillStyle = "rgba(255,92,138,.5)";
+    c.beginPath(); c.ellipse(-r * .48, r * .2, e * 1.6, e, 0, 0, Math.PI * 2); c.ellipse(r * .48, r * .2, e * 1.6, e, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = "#4b2a36"; c.lineWidth = Math.max(1.2, r * .06); c.lineCap = "round";
+    c.beginPath(); c.arc(0, r * .12, r * .13, .15 * Math.PI, .85 * Math.PI); c.stroke();
+  }
+  c.restore();
+}
+function icon(canvasEl, t, size) {
+  const c = canvasEl.getContext("2d"); c.clearRect(0, 0, canvasEl.width, canvasEl.height);
+  const s = canvasEl.width / 2;
+  drawTreat(c, t, s, s * (TREATS[t].detail === "candles" ? 1.12 : 1), s * (size || .82));
+}
+
+/* ---------- ladder ---------- */
+$("ladder").replaceChildren(...TREATS.flatMap((t, i) => {
+  const cv = document.createElement("canvas"); cv.width = 60; cv.height = 60; cv.title = t.name; icon(cv, i, .7);
+  return i ? [Object.assign(document.createElement("span"), { textContent: "›" }), cv] : [cv];
+}));
+$("introLadder").replaceChildren(...TREATS.map((t, i) => {
+  const d = document.createElement("div"), cv = document.createElement("canvas"); cv.width = 92; cv.height = 92; icon(cv, i, .7);
+  d.append(cv, document.createTextNode(t.name)); return d;
+}));
+
+/* ---------- sound ---------- */
+let audio = null, muted = false;
+function pop(tier) {
+  if (muted) return;
+  try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume?.(); } catch (e) { return; }
+  const t = audio.currentTime, base = 900 - tier * 70;
+  [base, base * 1.5].forEach((f, i) => {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(f, t + i * .05); o.frequency.exponentialRampToValueAtTime(f * 1.3, t + i * .05 + .08);
+    g.gain.setValueAtTime(.09, t + i * .05); g.gain.exponentialRampToValueAtTime(.0001, t + i * .05 + .25);
+    o.connect(g).connect(audio.destination); o.start(t + i * .05); o.stop(t + i * .05 + .3);
+  });
+}
+function plop() {
+  if (muted || !audio) return;
+  const t = audio.currentTime, o = audio.createOscillator(), g = audio.createGain();
+  o.type = "triangle"; o.frequency.setValueAtTime(320, t); o.frequency.exponentialRampToValueAtTime(160, t + .12);
+  g.gain.setValueAtTime(.06, t); g.gain.exponentialRampToValueAtTime(.0001, t + .15);
+  o.connect(g).connect(audio.destination); o.start(t); o.stop(t + .2);
+}
+$("mute").addEventListener("click", () => { muted = !muted; $("mute").textContent = muted ? "×" : "♪"; $("mute").setAttribute("aria-label", muted ? "Turn sound on" : "Turn sound off"); });
+
+/* ---------- game state ---------- */
+let balls = [], score = 0, best = 0, current = 0, next = 0, aimX = W / 2, canDrop = true, state = "intro", dangerT = 0, maxTier = 0, sparkles = [], idSeq = 0;
+try { best = +localStorage.getItem("kounouz-merge-best") || 0; } catch (e) {}
+$("best").textContent = best;
+const rollTier = () => { const r = Math.random(); return r < .38 ? 0 : r < .66 ? 1 : r < .86 ? 2 : r < .97 ? 3 : 4; };
+
+function reset() {
+  balls = []; score = 0; dangerT = 0; maxTier = 0; sparkles = [];
+  current = rollTier(); next = rollTier(); canDrop = true;
+  $("score").textContent = 0; icon($("nextC"), next);
+}
+function drop() {
+  if (!canDrop || state !== "play") return;
+  const r = TREATS[current].r;
+  const x = Math.min(Math.max(aimX, WALL + r), W - WALL - r);
+  balls.push({ id: idSeq++, t: current, x, y: 40, vx: 0, vy: 0, r, born: performance.now(), squish: 0 });
+  plop();
+  current = next; next = rollTier(); icon($("nextC"), next);
+  canDrop = false; setTimeout(() => canDrop = true, 420);
+}
+
+/* ---------- input ---------- */
+function toLocal(e) { const b = canvas.getBoundingClientRect(); return (e.clientX - b.left) / b.width * W; }
+canvas.addEventListener("pointerdown", e => { if (state !== "play") return; canvas.setPointerCapture?.(e.pointerId); aimX = toLocal(e); });
+canvas.addEventListener("pointermove", e => { if (state === "play") aimX = toLocal(e); });
+canvas.addEventListener("pointerup", e => { if (state !== "play") return; aimX = toLocal(e); drop(); });
+addEventListener("keydown", e => {
+  if (state !== "play") return;
+  if (e.key === "ArrowLeft") aimX -= 18; else if (e.key === "ArrowRight") aimX += 18;
+  else if (e.key === " " || e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); drop(); }
+});
+
+/* ---------- physics ---------- */
+const G = 1500;
+function step(dt) {
+  const sub = 6, h = dt / sub;
+  for (let s = 0; s < sub; s++) {
+    for (const b of balls) {
+      b.vy += G * h; b.x += b.vx * h; b.y += b.vy * h;
+      if (b.x - b.r < WALL) { b.x = WALL + b.r; b.vx *= -.3; }
+      if (b.x + b.r > W - WALL) { b.x = W - WALL - b.r; b.vx *= -.3; }
+      if (b.y + b.r > H - WALL) { b.y = H - WALL - b.r; if (b.vy > 220) b.squish = .12; b.vy *= -.15; b.vx *= .96; }
+    }
+    for (let i = 0; i < balls.length; i++) for (let j = i + 1; j < balls.length; j++) {
+      const a = balls[i], b = balls[j];
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || .01, min = a.r + b.r;
+      if (d >= min) continue;
+      if (a.t === b.t && !a.dead && !b.dead && a.t < TREATS.length - 1) { merge(a, b); continue; }
+      const nx = dx / d, ny = dy / d, over = min - d;
+      const ma = a.r * a.r, mb = b.r * b.r, tot = ma + mb;
+      a.x -= nx * over * (mb / tot); a.y -= ny * over * (mb / tot);
+      b.x += nx * over * (ma / tot); b.y += ny * over * (ma / tot);
+      const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+      if (rv < 0) {
+        const imp = -(1.15) * rv / (1 / ma + 1 / mb);
+        a.vx -= imp * nx / ma; a.vy -= imp * ny / ma;
+        b.vx += imp * nx / mb; b.vy += imp * ny / mb;
+      }
+    }
+    balls = balls.filter(b => !b.dead);
+  }
+  for (const b of balls) { b.vx *= .995; b.squish *= .85; }
+}
+function merge(a, b) {
+  a.dead = b.dead = true;
+  const t = a.t + 1, T = TREATS[t];
+  const nb = { id: idSeq++, t, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, vx: (a.vx + b.vx) / 2, vy: Math.min(a.vy, b.vy) * .5 - 60, r: T.r, born: performance.now(), squish: -.15 };
+  balls.push(nb);
+  const pts = (t + 1) * (t + 2) / 2 * 2;
+  score += pts; $("score").textContent = score;
+  if (score > best) { best = score; $("best").textContent = best; try { localStorage.setItem("kounouz-merge-best", best); } catch (e) {} }
+  pop(t);
+  burst(nb.x, nb.y, T.c, 8 + t * 2);
+  floatText(nb.x, nb.y, "+" + pts);
+  if (t > maxTier) { maxTier = t; if (UNLOCK_LINES[t]) toast(T.name, UNLOCK_LINES[t]); }
+  else if (t >= 3 && Math.random() < .3) floatText(nb.x, nb.y - 26, CHEERS[(Math.random() * CHEERS.length) | 0]);
+}
+function burst(x, y, color, n) {
+  if (reduceMotion) n = Math.min(n, 4);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = 80 + Math.random() * 180;
+    sparkles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 60, life: 1, color, heart: Math.random() < .4 });
+  }
+}
+
+/* ---------- ui fx ---------- */
+function toast(title, text) {
+  const el = document.createElement("div"); el.className = "toast";
+  el.innerHTML = "<small></small><span></span>";
+  el.firstChild.textContent = "New: " + title; el.lastChild.textContent = text;
+  $("fx").replaceChildren(el); setTimeout(() => el.remove(), 2900);
+}
+function floatText(x, y, text) {
+  const b = canvas.getBoundingClientRect(), w = $("wrap").getBoundingClientRect();
+  const el = document.createElement("div"); el.className = "combo"; el.textContent = text;
+  el.style.left = (b.left - w.left + x / W * b.width - 20) + "px";
+  el.style.top = (b.top - w.top + y / H * b.height - 20) + "px";
+  $("wrap").appendChild(el); setTimeout(() => el.remove(), 1000);
+}
+
+/* ---------- render ---------- */
+function render(now) {
+  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  // jar background stripes
+  ctx.fillStyle = "#fffaf6"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(255,214,226,.25)";
+  for (let x = 0; x < W; x += 40) ctx.fillRect(x, 0, 20, H);
+  // danger line
+  const danger = dangerT > 0;
+  ctx.strokeStyle = danger ? `rgba(255,61,115,${.5 + .5 * Math.sin(now / 90)})` : "rgba(165,133,147,.45)";
+  ctx.setLineDash([8, 8]); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(WALL, LINE); ctx.lineTo(W - WALL, LINE); ctx.stroke(); ctx.setLineDash([]);
+  // aim guide + held treat
+  if (state === "play") {
+    const r = TREATS[current].r, x = Math.min(Math.max(aimX, WALL + r), W - WALL - r);
+    ctx.strokeStyle = "rgba(165,133,147,.25)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, 40 + r); ctx.lineTo(x, H - WALL); ctx.stroke();
+    ctx.globalAlpha = canDrop ? 1 : .45; drawTreat(ctx, current, x, 40, r); ctx.globalAlpha = 1;
+  }
+  for (const b of balls) drawTreat(ctx, b.t, b.x, b.y, b.r, true, b.squish);
+  for (const s of sparkles) {
+    ctx.globalAlpha = Math.max(0, s.life); ctx.fillStyle = s.color;
+    if (s.heart) { ctx.font = "14px sans-serif"; ctx.fillText("♥", s.x - 5, s.y + 5); }
+    else { ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  // jar walls
+  ctx.strokeStyle = "#f3d6c8"; ctx.lineWidth = WALL * 2;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(0, 0, W, H, 26) : ctx.rect(0, 0, W, H); ctx.stroke();
+}
+
+let last = 0;
+function loop(now) {
+  const dt = Math.min(.033, (now - (last || now)) / 1000); last = now;
+  if (state === "play") {
+    step(dt);
+    const over = balls.some(b => now - b.born > 1200 && b.y - b.r < LINE && Math.abs(b.vy) < 120);
+    dangerT = over ? dangerT + dt : 0;
+    if (dangerT > 2) gameOver();
+  }
+  for (const s of sparkles) { s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 500 * dt; s.life -= dt * 1.4; }
+  sparkles = sparkles.filter(s => s.life > 0);
+  render(now);
+  requestAnimationFrame(loop);
+}
+
+function gameOver() {
+  state = "over";
+  $("finalScore").textContent = score;
+  $("overMsg").textContent = OVER_LINES[(Math.random() * OVER_LINES.length) | 0];
+  $("overBest").textContent = `Best: ${best} · Highest treat: ${TREATS[maxTier].name}`;
+  $("over").hidden = false;
+  $("again").focus({ preventScroll: true });
+}
+function start() {
+  try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume?.(); } catch (e) {}
+  reset(); state = "play";
+  $("intro").hidden = true; $("over").hidden = true;
+}
+$("start").addEventListener("click", start);
+$("again").addEventListener("click", start);
+
+/* ---------- sizing ---------- */
+function fit() {
+  const w = $("wrap"), aw = w.clientWidth, ah = w.clientHeight;
+  scale = Math.min(aw / W, ah / H);
+  dpr = Math.min(devicePixelRatio || 1, 3);
+  canvas.style.width = Math.floor(W * scale) + "px"; canvas.style.height = Math.floor(H * scale) + "px";
+  canvas.width = Math.round(W * scale * dpr); canvas.height = Math.round(H * scale * dpr);
+}
+addEventListener("resize", fit);
+reset(); fit(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
